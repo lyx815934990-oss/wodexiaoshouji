@@ -348,6 +348,7 @@ body {
   flex: 1;
   padding: 8px 10px 12px;
   overflow-y: auto;
+  background: url('../image/默认壁纸1.png') center center / cover no-repeat;
 }
 
 .wechat-chat-time {
@@ -355,11 +356,18 @@ body {
   font-size: 11px;
   color: #9ca3af;
   margin: 4px 0 10px;
+  background-color: rgba(255, 255, 255, 0.7);
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: block;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .wechat-row {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   margin-bottom: 8px;
 }
 
@@ -384,6 +392,7 @@ body {
   margin: 0 6px;
   flex-shrink: 0;
   overflow: hidden;
+  align-self: flex-start;
 }
 
 .wechat-avatar img {
@@ -396,6 +405,8 @@ body {
 .wechat-avatar-self {
   background: #111827;
   color: #f9fafb;
+  flex-shrink: 0;
+  align-self: flex-start;
 }
 
 .wechat-bubble {
@@ -416,8 +427,7 @@ body {
   content: '';
   position: absolute;
   left: -6px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 12px;
   width: 0;
   height: 0;
   border-top: 6px solid transparent;
@@ -434,8 +444,7 @@ body {
   content: '';
   position: absolute;
   right: -6px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 12px;
   width: 0;
   height: 0;
   border-top: 6px solid transparent;

@@ -152,6 +152,7 @@ type ChatMessage = {
   text: string;
   time: string;
   greeting?: string; // 打招呼消息（仅系统消息使用）
+  voiceDuration?: number; // 语音消息时长（秒），如果存在则表示这是语音消息
 };
 
 const CHAT_MESSAGES_KEY_PREFIX = 'mini-ai-phone.chat-messages-';
@@ -301,6 +302,21 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
   const [discoverView, setDiscoverView] = React.useState<DiscoverView>('list');
   const [showMomentsTitle, setShowMomentsTitle] = React.useState(false);
   const momentsListRef = React.useRef<HTMLDivElement | null>(null);
+  // 聊天消息容器引用
+  const chatContainerRef = React.useRef<HTMLDivElement | null>(null);
+  
+  // 滚动到聊天底部
+  const scrollToBottom = React.useCallback(() => {
+    if (chatContainerRef.current) {
+      // 使用 setTimeout 确保 DOM 更新后再滚动
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+      }, 100);
+    }
+  }, []);
+  
   // 搜索相关状态
   const [searchView, setSearchView] = React.useState<SearchView>('none');
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -321,6 +337,11 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
   const [chatMessagesKey, setChatMessagesKey] = React.useState(0);
   // 输入框文本
   const [inputText, setInputText] = React.useState('');
+  // 语音消息弹窗状态
+  const [showVoiceModal, setShowVoiceModal] = React.useState(false);
+  const [voiceText, setVoiceText] = React.useState('');
+  // 展开的语音消息ID
+  const [expandedVoiceId, setExpandedVoiceId] = React.useState<string | null>(null);
   
   // 监听联系人变化，更新聊天列表
   React.useEffect(() => {
@@ -340,10 +361,23 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
         setChatMessagesKey(prev => prev + 1); // 强制重新渲染消息
       }
     };
+
+    // 监听微信消息更新事件（从剧情模式同步的消息）
+    const handleWeChatMessagesUpdated = (event: CustomEvent<{ roleId: string; chatId: string; messages: any[] }>) => {
+      const { roleId, chatId } = event.detail;
+      console.log('[WeChatApp] 收到微信消息更新事件:', { roleId, chatId });
+      // 如果当前正在查看该聊天，触发重新渲染
+      if (activeChatId === chatId) {
+        console.log('[WeChatApp] 当前正在查看该聊天，触发重新渲染消息');
+        setChats(loadWeChatChats());
+        setChatMessagesKey(prev => prev + 1); // 强制重新渲染消息
+      }
+    };
     
     // 监听 localStorage 变化
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('friend-request-accepted', handleFriendRequestAccepted as unknown as EventListener);
+    window.addEventListener('wechat-messages-updated', handleWeChatMessagesUpdated as unknown as EventListener);
     
     // 定期检查（因为同源页面不会触发 storage 事件）
     // 只更新聊天列表，不强制刷新消息显示（避免频繁滚动）
@@ -355,9 +389,17 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('friend-request-accepted', handleFriendRequestAccepted as unknown as EventListener);
+      window.removeEventListener('wechat-messages-updated', handleWeChatMessagesUpdated as unknown as EventListener);
       clearInterval(interval);
     };
   }, [activeChatId]);
+
+  // 当聊天ID变化或消息更新时，滚动到底部
+  React.useEffect(() => {
+    if (activeChatId) {
+      scrollToBottom();
+    }
+  }, [activeChatId, chatMessagesKey, scrollToBottom]);
 
   const activeChat =
     activeChatId == null
@@ -435,7 +477,7 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
   };
 
   // 生成AI回复（微信消息，第一人称）
-  const generateWeChatReply = async (playerMessages: string[], role: StoryRole): Promise<string[]> => {
+  const generateWeChatReply = async (playerMessages: string[], role: StoryRole): Promise<Array<{ text: string; isVoice: boolean; voiceDuration?: number }>> => {
     const cfg = loadApiConfig();
     if (!cfg.baseUrl || !cfg.model) {
       throw new Error('请先在 API 设置中配置好接口地址和模型');
@@ -546,7 +588,12 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
               `   - 回复要有上下文连贯性，就像真人在看聊天记录后回复\n` +
               `   - 不要用过于正式或书面化的语言\n` +
               `   - 不要用"您好"、"感谢"等过于客套的词汇（除非角色设定如此）\n` +
-              `9）**关键：线上消息和线下剧情必须互相照应，不能脱节！**\n` +
+              `9）**语音消息格式（可选）**：\n` +
+              `   - 你可以选择发送语音消息，格式为：说话内容，可以包含声音描述或环境声音\n` +
+              `   - 示例："（声音带有一丝委屈）啊..是吗"、"（周围充满了汽车的喇叭声）稍等一下"或直接输出角色说的话\n` +
+              `   - 如果使用语音消息格式，请在消息前加上标记 [语音]\n` +
+              `   - 语音消息的文本内容应该只包含说话内容和声音相关的描述\n` +
+              `10）**关键：线上消息和线下剧情必须互相照应，不能脱节！**\n` +
               `   - 如果线下剧情中角色和玩家正在面对面（比如在同一场景、正在对话），角色可能只是看一眼手机，但不回复线上消息，而是直接在线下剧情中与玩家对话\n` +
               `   - 如果角色正在忙碌、睡觉、开会等场景，可能不回复或延迟回复\n` +
               `   - 如果角色和玩家不在同一场景，角色会正常回复微信消息\n` +
@@ -581,7 +628,7 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
     }
 
     // 将回复分割成多条消息（按换行符或句号分割）
-    const replies = text
+    let replies = text
       .split(/\n+/)
       .map(line => line.trim())
       .filter(line => line.length > 0);
@@ -590,15 +637,48 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
     if (replies.length === 1 && replies[0].length > 100) {
       const sentences = replies[0].split(/[。！？.!?]/).filter(s => s.trim().length > 0);
       if (sentences.length > 1) {
-        return sentences.map(s => s.trim() + '。').filter(s => s.length > 1);
+        replies = sentences.map(s => s.trim() + '。').filter(s => s.length > 1);
       }
     }
 
-    return replies.length > 0 ? replies : [text.trim()];
+    // 处理语音消息格式
+    const processedReplies = replies.map(reply => {
+      // 检测是否是语音消息格式
+      const isVoiceMessage = reply.startsWith('[语音]') || 
+                            reply.includes('（声音') || 
+                            reply.includes('(声音') ||
+                            reply.includes('（周围') ||
+                            reply.includes('(周围');
+      
+      if (isVoiceMessage) {
+        // 移除[语音]标记
+        let voiceText = reply.replace(/^\[语音\]\s*/, '');
+        
+        // 提取纯文本内容用于计算时长（移除声音描述）
+        const textContent = voiceText.replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '').trim();
+        
+        // 计算语音时长
+        const duration = calculateVoiceDuration(textContent || voiceText);
+        
+        // 返回语音消息对象
+        return {
+          text: voiceText,
+          voiceDuration: duration,
+          isVoice: true
+        };
+      }
+      
+      return {
+        text: reply,
+        isVoice: false
+      };
+    });
+
+    return processedReplies.length > 0 ? processedReplies : [{ text: text.trim(), isVoice: false }];
   };
 
   // 异步生成剧情内容
-  const generateStoryContent = async (playerMessages: string[], roleId: string) => {
+  const generateStoryContent = async (playerMessages: string[], roleId: string, wechatReplies?: string) => {
     try {
       console.log('[WeChatApp] generateStoryContent 被调用:', { roleId, messageCount: playerMessages.length });
       
@@ -624,7 +704,7 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
 
       // 调用StoryApp中的generateAIResponse函数（通过事件触发）
       const event = new CustomEvent('generate-story-for-wechat-message', {
-        detail: { roleId, playerMessages, existingTurns }
+        detail: { roleId, playerMessages, existingTurns, wechatReplies }
       });
       
       console.log('[WeChatApp] 准备触发剧情生成事件:', { roleId, playerMessages, existingTurnsCount: existingTurns.length });
@@ -664,8 +744,65 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
     setInputText('');
     // 触发重新渲染
     setChatMessagesKey(prev => prev + 1);
+    // 滚动到底部
+    scrollToBottom();
 
     console.log('[WeChatApp] 已发送消息（不调用AI）:', messagesToSend);
+  };
+
+  // 计算语音时长（根据文本字数，按每分钟180字计算，即3字/秒）
+  const calculateVoiceDuration = (text: string): number => {
+    const charCount = text.length;
+    // 每分钟180字 = 每秒3字
+    const duration = Math.ceil(charCount / 3);
+    // 最少1秒
+    return Math.max(1, duration);
+  };
+
+  // 打开语音消息弹窗
+  const handleOpenVoiceModal = () => {
+    if (!activeChat) return;
+    setShowVoiceModal(true);
+    setVoiceText('');
+  };
+
+  // 关闭语音消息弹窗
+  const handleCloseVoiceModal = () => {
+    setShowVoiceModal(false);
+    setVoiceText('');
+  };
+
+  // 发送语音消息
+  const handleSendVoiceMessage = () => {
+    if (!activeChat || !voiceText.trim()) return;
+
+    const textToSend = voiceText.trim();
+    const duration = calculateVoiceDuration(textToSend);
+
+    // 保存语音消息
+    const messages = loadChatMessages(activeChat.id);
+    const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    
+    const message: ChatMessage = {
+      id: `voice-${Date.now()}-${Math.random()}`,
+      from: 'self',
+      text: textToSend,
+      time: time,
+      voiceDuration: duration // 标记为语音消息
+    };
+    
+    messages.push(message);
+    saveChatMessages(activeChat.id, messages);
+
+    // 关闭弹窗并清空输入
+    handleCloseVoiceModal();
+    
+    // 触发重新渲染
+    setChatMessagesKey(prev => prev + 1);
+    // 滚动到底部
+    scrollToBottom();
+
+    console.log('[WeChatApp] 已发送语音消息，时长:', `"${duration}"`, '秒，内容:', textToSend);
   };
 
   // 调用AI生成回复和剧情（处理已有的未处理消息）
@@ -728,19 +865,23 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
       const role = roles.find(r => r.id === chatRoleId);
       
       if (role) {
-        // 生成微信回复
+        // 先生成微信回复，然后将回复内容传递给剧情生成，确保一致性
         generateWeChatReply(unprocessedMessages, role)
           .then(async (replies) => {
+            // 收集所有回复文本（用于传递给剧情生成）
+            const allReplyTexts = replies.map(r => r.text).join('；');
+            
             // 逐条添加AI回复，每条消息之间有延迟
             const replyTime = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
             
             for (let i = 0; i < replies.length; i++) {
-              const replyText = replies[i];
+              const reply = replies[i];
               const replyMessage: ChatMessage = {
                 id: `reply-${Date.now()}-${i}-${Math.random()}`,
                 from: 'other',
-                text: replyText,
-                time: replyTime
+                text: reply.text,
+                time: replyTime,
+                ...(reply.isVoice && reply.voiceDuration ? { voiceDuration: reply.voiceDuration } : {})
               };
 
               // 加载当前消息列表并添加新消息
@@ -751,7 +892,10 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
               // 触发重新渲染
               setChatMessagesKey(prev => prev + 1);
               
-              console.log(`[WeChatApp] 已显示第${i + 1}条AI回复:`, replyText);
+              // 滚动到底部
+              scrollToBottom();
+              
+              console.log(`[WeChatApp] 已显示第${i + 1}条AI回复:`, reply.text, reply.isVoice ? `(语音消息 ${reply.voiceDuration}秒)` : '');
               
               // 如果不是最后一条，等待一段时间再显示下一条（模拟真实聊天）
               if (i < replies.length - 1) {
@@ -760,6 +904,17 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
             }
 
             console.log('[WeChatApp] 所有AI回复已显示完成');
+            
+            // 微信回复完成后，生成剧情内容，并将回复内容传递给剧情生成，确保一致性
+            (async () => {
+              try {
+                console.log('[WeChatApp] 开始生成剧情内容，使用微信回复内容:', allReplyTexts);
+                await generateStoryContent(unprocessedMessages, chatRoleId, allReplyTexts);
+                console.log('[WeChatApp] 剧情生成事件已触发');
+              } catch (err) {
+                console.error('[WeChatApp] 生成剧情失败:', err);
+              }
+            })();
           })
           .catch((err) => {
             console.error('[WeChatApp] 生成AI回复失败:', err);
@@ -767,17 +922,6 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
           .finally(() => {
             setIsSending(false);
           });
-
-        // 异步生成剧情内容（不阻塞，立即执行）
-        (async () => {
-          try {
-            console.log('[WeChatApp] 开始异步生成剧情内容...');
-            await generateStoryContent(unprocessedMessages, chatRoleId);
-            console.log('[WeChatApp] 剧情生成事件已触发');
-          } catch (err) {
-            console.error('[WeChatApp] 生成剧情失败:', err);
-          }
-        })();
       }
     }
   };
@@ -1292,7 +1436,10 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
       ) : activeTab === 'chat' ? (
         activeChat ? (
           <>
-            <div className="wechat-chat">
+            <div 
+              className="wechat-chat"
+              ref={chatContainerRef}
+            >
               {(() => {
                 let chatMessages = loadChatMessages(activeChat.id);
                 
@@ -1368,28 +1515,112 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
                       }
                       
                       const msg = item.content as ChatMessage;
+                      const isExpanded = expandedVoiceId === msg.id;
+                      
                       return (
                         <div
                           key={msg.id}
-                          className={`wechat-row wechat-row-${msg.from}`}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: msg.from === 'self' ? 'flex-end' : 'flex-start',
+                            width: '100%'
+                          }}
                         >
-                          {msg.from === 'other' && (
-                            <div className="wechat-avatar">
-                              {activeChat.avatarUrl ? (
-                                <img src={activeChat.avatarUrl} alt={activeChat.name} />
+                          <div
+                            className={`wechat-row wechat-row-${msg.from}`}
+                            style={{ width: '100%' }}
+                          >
+                            {msg.from === 'other' && (
+                              <div className="wechat-avatar">
+                                {activeChat.avatarUrl ? (
+                                  <img src={activeChat.avatarUrl} alt={activeChat.name} />
+                                ) : (
+                                  <span>{activeChat.avatarText}</span>
+                                )}
+                              </div>
+                            )}
+                            <div
+                              className={`wechat-bubble wechat-bubble-${msg.from}`}
+                              style={msg.voiceDuration ? {
+                                cursor: 'pointer',
+                                userSelect: 'none',
+                                width: 'fit-content',
+                                maxWidth: '70%'
+                              } : {}}
+                              onClick={msg.voiceDuration ? () => {
+                                setExpandedVoiceId(isExpanded ? null : msg.id);
+                              } : undefined}
+                            >
+                              {msg.voiceDuration ? (
+                                // 语音消息样式
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  minWidth: '80px',
+                                  padding: '0'
+                                }}>
+                                  <svg
+                                    viewBox="0 0 24 24"
+                                    width="20"
+                                    height="20"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    style={{
+                                      flexShrink: 0,
+                                      transform: 'rotate(-90deg)',
+                                      transformOrigin: 'center'
+                                    }}
+                                  >
+                                    {/* WiFi/声波样式 - 2层弧形从底部中心向上扩散 */}
+                                    <path d="M8.53 16.11a6 6 0 0 1 6.95 0" fill="none"/>
+                                    <path d="M5 12.55a11 11 0 0 1 14.08 0" fill="none"/>
+                                    <line x1="12" y1="20" x2="12.01" y2="20" strokeWidth="2.5" strokeLinecap="round"/>
+                                  </svg>
+                                  <span style={{
+                                    fontSize: '14px',
+                                    fontWeight: '400'
+                                  }}>
+                                    &quot;{msg.voiceDuration}&quot;
+                                  </span>
+                                </div>
                               ) : (
-                                <span>{activeChat.avatarText}</span>
+                                // 普通文本消息
+                                msg.text
                               )}
                             </div>
-                          )}
-                          <div
-                            className={`wechat-bubble wechat-bubble-${msg.from}`}
-                          >
-                            {msg.text}
+                            {msg.from === 'self' && (
+                              <div className="wechat-avatar wechat-avatar-self">
+                                <span>我</span>
+                              </div>
+                            )}
                           </div>
-                          {msg.from === 'self' && (
-                            <div className="wechat-avatar wechat-avatar-self">
-                              <span>我</span>
+                          {/* 展开的语音文字内容 - 显示在气泡下方 */}
+                          {msg.voiceDuration && isExpanded && (
+                            <div
+                              style={{
+                                marginTop: '4px',
+                                marginBottom: '16px',
+                                padding: '10px 12px',
+                                backgroundColor: '#ffffff',
+                                borderRadius: '8px',
+                                fontSize: '14px',
+                                lineHeight: '1.5',
+                                color: '#000000',
+                                wordBreak: 'break-word',
+                                overflowWrap: 'anywhere',
+                                width: 'fit-content',
+                                maxWidth: '70%',
+                                boxSizing: 'border-box',
+                                alignSelf: msg.from === 'self' ? 'flex-end' : 'flex-start',
+                                marginLeft: msg.from === 'other' ? '48px' : '0',
+                                marginRight: msg.from === 'self' ? '48px' : '0'
+                              }}
+                            >
+                              {msg.text}
                             </div>
                           )}
                         </div>
@@ -1401,7 +1632,32 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
             </div>
 
             <div className="wechat-input-bar">
-              <div className="wechat-input-left" />
+              <button
+                type="button"
+                className="wechat-input-voice"
+                onClick={handleOpenVoiceModal}
+                title="语音消息"
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  border: 'none',
+                  background: '#f0f0f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  flexShrink: 0,
+                  marginRight: '8px',
+                  padding: 0
+                }}
+              >
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="#666">
+                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </svg>
+              </button>
               <textarea
                 className="wechat-input-main"
                 placeholder="发一条消息给 AI..."
@@ -1445,6 +1701,115 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit }) => {
                 </svg>
               </button>
             </div>
+
+            {/* 语音消息输入弹窗 */}
+            {showVoiceModal && (
+              <div
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 1000
+                }}
+                onClick={handleCloseVoiceModal}
+              >
+                <div
+                  style={{
+                    backgroundColor: 'white',
+                    borderRadius: '12px',
+                    padding: '24px',
+                    width: '90%',
+                    maxWidth: '400px',
+                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div style={{ marginBottom: '16px' }}>
+                    <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '500' }}>
+                      语音消息
+                    </h3>
+                    <textarea
+                      value={voiceText}
+                      onChange={(e) => setVoiceText(e.target.value)}
+                      placeholder="输入语音消息内容..."
+                      style={{
+                        width: '100%',
+                        minHeight: '120px',
+                        padding: '12px',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        lineHeight: '1.5',
+                        resize: 'vertical',
+                        fontFamily: 'inherit'
+                      }}
+                      autoFocus
+                    />
+                    <div
+                      style={{
+                        marginTop: '12px',
+                        fontSize: '14px',
+                        color: '#666',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      <span>时长：</span>
+                      <span style={{ fontWeight: '500', color: '#333' }}>
+                        &quot;{calculateVoiceDuration(voiceText)}&quot;
+                      </span>
+                      <span>秒</span>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '12px',
+                      justifyContent: 'flex-end'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={handleCloseVoiceModal}
+                      style={{
+                        padding: '8px 16px',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: '6px',
+                        background: 'white',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                      }}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSendVoiceMessage}
+                      disabled={!voiceText.trim()}
+                      style={{
+                        padding: '8px 16px',
+                        border: 'none',
+                        borderRadius: '6px',
+                        background: voiceText.trim() ? '#07c160' : '#ccc',
+                        color: 'white',
+                        cursor: voiceText.trim() ? 'pointer' : 'not-allowed',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                      }}
+                    >
+                      发送
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <div className="wechat-list">

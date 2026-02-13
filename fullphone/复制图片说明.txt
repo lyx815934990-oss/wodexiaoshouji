@@ -1,0 +1,14 @@
+由于路径编码问题，请手动复制以下文件：
+
+源目录：fullphone\桌宠素材\
+目标目录：fullphone\public\pet-images\
+
+需要复制的文件：
+1. 桌宠猫咪（幼崽）.png  →  cat-stage1.png
+2. 桌宠猫咪（青年）.png  →  cat-stage2.png
+3. 桌宠猫咪（成年）.png  →  cat-stage3.png
+
+复制完成后，刷新浏览器即可看到猫咪立绘。
+
+或者你也可以直接运行 copy-pet-images.bat 批处理文件。
+

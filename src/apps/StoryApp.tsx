@@ -272,7 +272,8 @@ const clearRoleRuntime = (roleId: string) => {
     const keys = [
       `mini-ai-phone.chat-${roleId}`,
       `mini-ai-phone.memory-${roleId}`,
-      `mini-ai-phone.favor-${roleId}` // 同时清除好感度数据
+      `mini-ai-phone.favor-${roleId}`, // 同时清除好感度数据
+      `mini-ai-phone.chat-messages-chat-${roleId}` // 清除对应的微信聊天记录
     ];
     keys.forEach((k) => window.localStorage.removeItem(k));
   } catch {
@@ -296,6 +297,107 @@ const saveRoleChat = (roleId: string, turns: StoryTurn[]) => {
     window.localStorage.setItem(`mini-ai-phone.chat-${roleId}`, JSON.stringify(turns));
   } catch {
     // ignore
+  }
+};
+
+/**
+ * 从剧情文本中提取角色发送的微信消息，并同步到微信聊天页面
+ */
+const extractAndSyncWeChatMessages = (roleId: string, text: string) => {
+  try {
+    // 检查该角色是否在微信联系人中
+    const WECHAT_CONTACTS_KEY = 'mini-ai-phone.wechat-contacts';
+    const rawContacts = window.localStorage.getItem(WECHAT_CONTACTS_KEY);
+    if (!rawContacts) return;
+    
+    const contacts = JSON.parse(rawContacts);
+    const contact = contacts.find((c: any) => c.roleId === roleId);
+    if (!contact) return; // 如果角色不在微信联系人中，不处理
+
+    // 加载现有的微信聊天消息
+    const CHAT_MESSAGES_KEY_PREFIX = 'mini-ai-phone.chat-messages-';
+    const chatId = `chat-${roleId}`;
+    const messagesKey = `${CHAT_MESSAGES_KEY_PREFIX}${chatId}`;
+    const rawMessages = window.localStorage.getItem(messagesKey);
+    const existingMessages: Array<{ id: string; from: 'other' | 'self' | 'system'; text: string; time: string }> = rawMessages ? JSON.parse(rawMessages) : [];
+
+    // 提取微信消息的模式
+    // 匹配类似："发送了微信消息"、"在微信上说"、"发微信说"、"通过微信发送"等
+    const wechatPatterns = [
+      // 模式1: "发送了微信消息："xxx" 或 "在微信上发送："xxx""
+      /(?:发送|发|通过微信发送|在微信上(?:说|发|发送|回复|发消息))[^，。！？]*?[：:]["'"'"]([^"'"]+)["'"'"]/g,
+      // 模式2: "微信消息："xxx" 或 "微信说："xxx""
+      /(?:微信消息|微信说|微信回复)[：:]["'"'"]([^"'"]+)["'"'"]/g,
+      // 模式3: "给玩家发送微信："xxx" 或 "向玩家发微信："xxx""
+      /(?:给.*?发送|向.*?发送|给.*?发).*?微信[^，。！？]*?[：:]?["'"'"]([^"'"]+)["'"'"]/g,
+      // 模式4: "用微信发送："xxx" 或 "通过微信："xxx""
+      /(?:用微信|通过微信)[^，。！？]*?[：:]?["'"'"]([^"'"]+)["'"'"]/g,
+      // 模式5: "发来微信："xxx" 或 "发来消息："xxx""
+      /(?:发来微信|发来消息)[：:]["'"'"]([^"'"]+)["'"'"]/g,
+      // 模式6: 直接引号内的内容，前面有"微信"关键词
+      /微信[^，。！？]*?["'"'"]([^"'"]{3,})["'"'"]/g,
+    ];
+
+    const extractedMessages: string[] = [];
+    
+    // 尝试从文本中提取微信消息
+    for (const pattern of wechatPatterns) {
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        const messageText = match[1]?.trim();
+        if (messageText && messageText.length > 0) {
+          extractedMessages.push(messageText);
+        }
+      }
+    }
+
+    // 如果没有通过模式匹配到，尝试更宽松的匹配：查找包含"微信"和引号的内容
+    if (extractedMessages.length === 0) {
+      const loosePattern = /微信[^，。！？]*?["""]([^"""]{5,})["""]/g;
+      let match;
+      while ((match = loosePattern.exec(text)) !== null) {
+        const messageText = match[1]?.trim();
+        if (messageText && messageText.length > 0 && messageText.length < 200) {
+          extractedMessages.push(messageText);
+        }
+      }
+    }
+
+    // 将提取的消息添加到微信聊天消息列表
+    if (extractedMessages.length > 0) {
+      const newMessages: Array<{ id: string; from: 'other' | 'self' | 'system'; text: string; time: string }> = [];
+      
+      for (const messageText of extractedMessages) {
+        // 检查是否已经存在相同的消息（避免重复）
+        const isDuplicate = existingMessages.some(msg => 
+          msg.from === 'other' && msg.text === messageText
+        );
+        
+        if (!isDuplicate) {
+          const now = new Date();
+          newMessages.push({
+            id: `story-${Date.now()}-${Math.random()}`,
+            from: 'other',
+            text: messageText,
+            time: now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+          });
+        }
+      }
+
+      if (newMessages.length > 0) {
+        const allMessages = [...existingMessages, ...newMessages];
+        window.localStorage.setItem(messagesKey, JSON.stringify(allMessages));
+        
+        // 触发事件，通知WeChatApp更新消息显示
+        window.dispatchEvent(new CustomEvent('wechat-messages-updated', {
+          detail: { roleId, chatId, messages: allMessages }
+        }));
+        
+        console.log(`[StoryApp] 已从剧情中提取并同步 ${newMessages.length} 条微信消息到聊天页面`);
+      }
+    }
+  } catch (err) {
+    console.error('[StoryApp] 提取微信消息失败:', err);
   }
 };
 
@@ -325,6 +427,33 @@ const saveRoleStatusCache = (roleId: string, key: string, list: CharacterStatus[
   } catch {
     // ignore
   }
+};
+
+/**
+ * 计算两个行程安排字符串的相似度（0-1之间）
+ */
+const calculateScheduleSimilarity = (str1: string, str2: string): number => {
+  if (!str1 || !str2) return 0;
+  if (str1 === str2) return 1;
+  
+  // 简单的相似度计算：基于共同词汇的比例
+  const words1 = str1.split(/[|\s]+/).filter(w => w.length > 0);
+  const words2 = str2.split(/[|\s]+/).filter(w => w.length > 0);
+  
+  if (words1.length === 0 || words2.length === 0) return 0;
+  
+  const set1 = new Set(words1);
+  const set2 = new Set(words2);
+  let common = 0;
+  
+  for (const word of set1) {
+    if (set2.has(word)) {
+      common++;
+    }
+  }
+  
+  const total = Math.max(set1.size, set2.size);
+  return total > 0 ? common / total : 0;
 };
 
 /**
@@ -669,8 +798,8 @@ type StoryAppProps = {
 };
 
 // 全局事件处理器：处理微信消息触发的剧情生成（不依赖React组件状态）
-const handleWeChatMessageStoryGlobally = async (event: CustomEvent<{ roleId: string; playerMessages: string[]; existingTurns: any[] }>) => {
-  const { roleId, playerMessages, existingTurns } = event.detail;
+const handleWeChatMessageStoryGlobally = async (event: CustomEvent<{ roleId: string; playerMessages: string[]; existingTurns: any[]; wechatReplies?: string }>) => {
+  const { roleId, playerMessages, existingTurns, wechatReplies } = event.detail;
   console.log('[StoryApp] [全局监听器] 收到微信消息剧情生成事件:', { roleId, messageCount: playerMessages.length });
 
   try {
@@ -688,7 +817,7 @@ const handleWeChatMessageStoryGlobally = async (event: CustomEvent<{ roleId: str
     }
 
     // 构造玩家消息的上下文描述（将所有消息合并，描述玩家通过微信发送了这些消息）
-    const playerMessagesText = `玩家通过微信向${role.name}发送了以下消息：${playerMessages.join('；')}`;
+    const playerMessagesText = `玩家通过微信向${role.name}发送了以下消息：${playerMessages.join('；')}${wechatReplies ? `\n\n**重要：角色在微信上已经回复了以下内容：${wechatReplies}**\n请确保线下剧情中角色的反应和微信回复内容保持一致。如果角色在微信上说了某些话，线下剧情应该体现角色发送这些消息时的状态、心理活动或场景。` : ''}`;
 
     // 需要调用generateAIResponse，但它在组件内部
     // 我们需要在这里重新实现生成逻辑，或者提取generateAIResponse到模块级别
@@ -798,8 +927,9 @@ const handleWeChatMessageStoryGlobally = async (event: CustomEvent<{ roleId: str
               '7）可以用第三人称，也可以在玩家输入是第一人称时保持第一人称视角，但仍然只描述当下和既成事实，不预设玩家未来的选择。\n' +
               '8）如果上一轮玩家输入是对白（被引号包住），你的续写要让这一句对白在当前场景中自然落地并引出新的反应；如果是场景描述，就顺势延展画面或人物状态。\n' +
               '9）**重要**：必须严格遵守角色设定（世界书内容），角色的行为、习惯、性格特征必须符合世界书中的设定。如果世界书中提到角色的某些习惯或特征（如"偶尔会抽烟"），在合适的场景中要自然地体现出来。\n' +
-              '10）**重要**：必须使用玩家的真实姓名来称呼玩家，不要用"你"或其他模糊称呼。如果玩家身份信息中提供了姓名，在对话和叙述中要使用这个姓名。\n' +
-              `11）**好感度系统**：当前角色对玩家的好感度为 ${favorData.value}/100，处于"${favorStageLabel}"阶段。角色对玩家的态度：${favorDescription}。**严禁玛丽苏式感情升温**：好感度的提升必须符合逻辑和现实，需要时间和合适的契机。即使玩家做了好事，角色的反应也要符合当前好感度阶段和角色人设，不会突然变得过于热情或做出不符合关系的亲密行为。好感度的提升是"慢火熬粥"式的渐进过程，不会因为一次互动就大幅提升。`
+              '10）**重要**：叙述视角使用第三人称上帝视角，但在指代玩家时使用"你"来称呼，这样更有代入感。例如："角色A看见你这个样子"、"角色B想着你可能没吃饭"。角色在对话中可以使用玩家的真实姓名或其他称号来称呼玩家，例如："角色A看见你过来了，立马叫住你：\"XX！你在这里干嘛呢？\""。\n' +
+              `11）**好感度系统**：当前角色对玩家的好感度为 ${favorData.value}/100，处于"${favorStageLabel}"阶段。角色对玩家的态度：${favorDescription}。**严禁玛丽苏式感情升温**：好感度的提升必须符合逻辑和现实，需要时间和合适的契机。即使玩家做了好事，角色的反应也要符合当前好感度阶段和角色人设，不会突然变得过于热情或做出不符合关系的亲密行为。好感度的提升是"慢火熬粥"式的渐进过程，不会因为一次互动就大幅提升。\n` +
+              '12）**微信消息格式**：如果剧情中角色需要通过微信向玩家发送消息，请使用明确的格式，例如："角色名在微信上发送："消息内容"" 或 "角色名发来微信："消息内容""。消息内容要用引号（""）明确标注，这样系统才能正确识别并同步到微信聊天页面。'
           },
           {
             role: 'user',
@@ -832,6 +962,9 @@ const handleWeChatMessageStoryGlobally = async (event: CustomEvent<{ roleId: str
 
     // 保存到localStorage
     saveRoleChat(roleId, withAi);
+
+    // 从AI回复中提取微信消息并同步到微信聊天页面
+    extractAndSyncWeChatMessages(roleId, aiResponse);
 
     // 触发UI更新事件
     window.dispatchEvent(new CustomEvent('story-updated', {
@@ -1011,8 +1144,9 @@ const handleFriendRequestGlobally = async (event: CustomEvent<{ roleId: string; 
               '7）可以用第三人称，也可以在玩家输入是第一人称时保持第一人称视角，但仍然只描述当下和既成事实，不预设玩家未来的选择。\n' +
               '8）如果上一轮玩家输入是对白（被引号包住），你的续写要让这一句对白在当前场景中自然落地并引出新的反应；如果是场景描述，就顺势延展画面或人物状态。\n' +
               '9）**重要**：必须严格遵守角色设定（世界书内容），角色的行为、习惯、性格特征必须符合世界书中的设定。如果世界书中提到角色的某些习惯或特征（如"偶尔会抽烟"），在合适的场景中要自然地体现出来。\n' +
-              '10）**重要**：必须使用玩家的真实姓名来称呼玩家，不要用"你"或其他模糊称呼。如果玩家身份信息中提供了姓名，在对话和叙述中要使用这个姓名。\n' +
-              `11）**好感度系统**：当前角色对玩家的好感度为 ${favorData.value}/100，处于"${favorStageLabel}"阶段。角色对玩家的态度：${favorDescription}。**严禁玛丽苏式感情升温**：好感度的提升必须符合逻辑和现实，需要时间和合适的契机。即使玩家做了好事，角色的反应也要符合当前好感度阶段和角色人设，不会突然变得过于热情或做出不符合关系的亲密行为。好感度的提升是"慢火熬粥"式的渐进过程，不会因为一次互动就大幅提升。${friendRequestContext}`
+              '10）**重要**：叙述视角使用第三人称上帝视角，但在指代玩家时使用"你"来称呼，这样更有代入感。例如："角色A看见你这个样子"、"角色B想着你可能没吃饭"。角色在对话中可以使用玩家的真实姓名或其他称号来称呼玩家，例如："角色A看见你过来了，立马叫住你：\"XX！你在这里干嘛呢？\""。\n' +
+              `11）**好感度系统**：当前角色对玩家的好感度为 ${favorData.value}/100，处于"${favorStageLabel}"阶段。角色对玩家的态度：${favorDescription}。**严禁玛丽苏式感情升温**：好感度的提升必须符合逻辑和现实，需要时间和合适的契机。即使玩家做了好事，角色的反应也要符合当前好感度阶段和角色人设，不会突然变得过于热情或做出不符合关系的亲密行为。好感度的提升是"慢火熬粥"式的渐进过程，不会因为一次互动就大幅提升。${friendRequestContext}\n` +
+              '12）**微信消息格式**：如果剧情中角色需要通过微信向玩家发送消息，请使用明确的格式，例如："角色名在微信上发送："消息内容"" 或 "角色名发来微信："消息内容""。消息内容要用引号（""）明确标注，这样系统才能正确识别并同步到微信聊天页面。'
           },
           {
             role: 'user',
@@ -1047,6 +1181,9 @@ const handleFriendRequestGlobally = async (event: CustomEvent<{ roleId: string; 
     // 保存到localStorage
     saveRoleChat(roleId, withAi);
     console.log('[StoryApp] [全局监听器] 已保存剧情到localStorage，总轮次:', withAi.length);
+
+    // 从AI回复中提取微信消息并同步到微信聊天页面
+    extractAndSyncWeChatMessages(roleId, aiResponse);
 
     // 触发UI更新事件（如果组件已挂载）
     window.dispatchEvent(new CustomEvent('story-updated', {
@@ -1430,6 +1567,9 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
         // 保存到localStorage
         saveRoleChat(roleId, withAi);
         console.log('[StoryApp] 已保存剧情到localStorage，总轮次:', withAi.length);
+
+        // 从AI回复中提取微信消息并同步到微信聊天页面
+        extractAndSyncWeChatMessages(roleId, aiResponse);
 
         // 如果用户当前正在阅读该角色，更新UI状态
         if (isCurrentRole) {
@@ -2652,8 +2792,9 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
               '7）可以用第三人称，也可以在玩家输入是第一人称时保持第一人称视角，但仍然只描述当下和既成事实，不预设玩家未来的选择。\n' +
               '8）如果上一轮玩家输入是对白（被引号包住），你的续写要让这一句对白在当前场景中自然落地并引出新的反应；如果是场景描述，就顺势延展画面或人物状态。\n' +
               '9）**重要**：必须严格遵守角色设定（世界书内容），角色的行为、习惯、性格特征必须符合世界书中的设定。如果世界书中提到角色的某些习惯或特征（如"偶尔会抽烟"），在合适的场景中要自然地体现出来。\n' +
-              '10）**重要**：必须使用玩家的真实姓名来称呼玩家，不要用"你"或其他模糊称呼。如果玩家身份信息中提供了姓名，在对话和叙述中要使用这个姓名。\n' +
-              `11）**好感度系统**：当前角色对玩家的好感度为 ${favorData.value}/100，处于"${favorStageLabel}"阶段。角色对玩家的态度：${favorDescription}。**严禁玛丽苏式感情升温**：好感度的提升必须符合逻辑和现实，需要时间和合适的契机。即使玩家做了好事，角色的反应也要符合当前好感度阶段和角色人设，不会突然变得过于热情或做出不符合关系的亲密行为。好感度的提升是"慢火熬粥"式的渐进过程，不会因为一次互动就大幅提升。${friendRequestContext}`
+              '10）**重要**：叙述视角使用第三人称上帝视角，但在指代玩家时使用"你"来称呼，这样更有代入感。例如："角色A看见你这个样子"、"角色B想着你可能没吃饭"。角色在对话中可以使用玩家的真实姓名或其他称号来称呼玩家，例如："角色A看见你过来了，立马叫住你：\"XX！你在这里干嘛呢？\""。\n' +
+              `11）**好感度系统**：当前角色对玩家的好感度为 ${favorData.value}/100，处于"${favorStageLabel}"阶段。角色对玩家的态度：${favorDescription}。**严禁玛丽苏式感情升温**：好感度的提升必须符合逻辑和现实，需要时间和合适的契机。即使玩家做了好事，角色的反应也要符合当前好感度阶段和角色人设，不会突然变得过于热情或做出不符合关系的亲密行为。好感度的提升是"慢火熬粥"式的渐进过程，不会因为一次互动就大幅提升。${friendRequestContext}\n` +
+              '12）**微信消息格式**：如果剧情中角色需要通过微信向玩家发送消息，请使用明确的格式，例如："角色名在微信上发送："消息内容"" 或 "角色名发来微信："消息内容""。消息内容要用引号（""）明确标注，这样系统才能正确识别并同步到微信聊天页面。'
           },
           {
             role: 'user',
@@ -2725,6 +2866,9 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
       ];
       setStoryTurns(withAi);
       saveRoleChat(roleId, withAi);
+
+      // 从AI回复中提取微信消息并同步到微信聊天页面
+      extractAndSyncWeChatMessages(roleId, aiResponse);
 
       // 检查AI回复中是否包含角色同意好友申请的内容
       checkAndProcessFriendRequest(roleId, aiResponse);
@@ -2845,6 +2989,9 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
       setStoryTurns(withNewResponse);
       saveRoleChat(currentRoleId, withNewResponse);
 
+      // 从AI回复中提取微信消息并同步到微信聊天页面
+      extractAndSyncWeChatMessages(currentRoleId, newResponse);
+
       // 如果最后一轮是玩家输入，需要评估好感度
       if (turnsWithoutLast.length > 0) {
         const lastPlayerTurn = turnsWithoutLast[turnsWithoutLast.length - 1];
@@ -2916,6 +3063,9 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
       ];
       setStoryTurns(withAi);
       saveRoleChat(currentRoleId, withAi);
+
+      // 从AI回复中提取微信消息并同步到微信聊天页面
+      extractAndSyncWeChatMessages(currentRoleId, aiResponse);
 
       // 检查AI回复中是否包含角色同意好友申请的内容
       checkAndProcessFriendRequest(currentRoleId, aiResponse);
@@ -3157,6 +3307,39 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
     // 获取玩家身份信息，用于过滤
     const playerIdentity = loadIdentity();
 
+    // 获取之前的行程安排（如果有），用于保持一致性
+    const previousSchedule: Record<string, string[]> = {};
+    if (cached && cached.list.length) {
+      cached.list.forEach((status) => {
+        if (status.schedule && status.schedule.length > 0) {
+          previousSchedule[status.name] = status.schedule;
+        }
+      });
+    } else if (statusList.length) {
+      statusList.forEach((status) => {
+        if (status.schedule && status.schedule.length > 0) {
+          previousSchedule[status.name] = status.schedule;
+        }
+      });
+    }
+
+    // 检查剧情中是否明确提到行程变更
+    const hasScheduleChange = recent && (
+      recent.includes('行程') || 
+      recent.includes('安排') || 
+      recent.includes('计划') ||
+      recent.includes('改变') ||
+      recent.includes('变更') ||
+      recent.includes('临时') ||
+      recent.includes('取消') ||
+      recent.includes('推迟') ||
+      recent.includes('提前')
+    );
+
+    const previousScheduleText = Object.keys(previousSchedule).length > 0
+      ? `\n\n**重要：保持行程安排一致性**\n以下是各角色之前的行程安排，请尽量保持相同，除非剧情明确提到行程变更：\n${Object.entries(previousSchedule).map(([name, schedule]) => `${name}：${schedule.join('；')}`).join('\n')}\n\n${hasScheduleChange ? '注意：剧情中提到了行程相关的内容，如果确实有行程变更，可以更新行程安排。' : '**如果剧情中没有明确提到行程变更、临时安排或计划改变，请保持之前的行程安排不变。**'}`
+      : '';
+
     try {
       const endpointBase = cfg.baseUrl.replace(/\/+$/, '');
       const url =
@@ -3186,11 +3369,16 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
                 '3）所有字段必须是字符串，其中 schedule 为字符串数组，每一项是"时间段＋事件"的格式，例如："8:00-9:00  去公司会议室开会"。\n' +
                 '4）不要编造极端、病态或与已有信息明显矛盾的内容，一切设定要贴合上下文和现实逻辑。\n' +
                 '5）innerVoice 一律使用该角色的第一人称视角，不要出现"他/她觉得……"这类旁观口吻。\n' +
-                '6）只返回 JSON，不要添加任何说明文字、注释或额外文本。'
+                '6）**关于行程安排（schedule）的重要规则**：\n' +
+                '   - 行程安排应该保持一致性，除非剧情明确提到行程变更、临时安排、计划改变等情况\n' +
+                '   - 如果提供了之前的行程安排，且剧情中没有明确提到行程变更，请保持相同的行程安排\n' +
+                '   - 只有在剧情明确提到"改变行程"、"临时安排"、"取消计划"、"推迟"、"提前"等关键词时，才更新行程安排\n' +
+                '   - 不要因为角色当前所在位置或正在做的事情而随意改变整个行程安排\n' +
+                '7）只返回 JSON，不要添加任何说明文字、注释或额外文本。'
             },
             {
               role: 'user',
-              content: `主角姓名：${role.name}。${playerIdentity.name ? `注意：玩家姓名是"${playerIdentity.name}"，**绝对不要**为玩家生成状态条目，只生成角色和NPC的状态。` : ''}以下是最近的剧情片段：\n${recent || '（目前还没有剧情记录，可以结合角色开场白简单推测当前场景。）'}\n请按上述 JSON 结构生成状态栏，只包含角色和NPC，绝不包含玩家。`
+              content: `主角姓名：${role.name}。${playerIdentity.name ? `注意：玩家姓名是"${playerIdentity.name}"，**绝对不要**为玩家生成状态条目，只生成角色和NPC的状态。` : ''}以下是最近的剧情片段：\n${recent || '（目前还没有剧情记录，可以结合角色开场白简单推测当前场景。）'}${previousScheduleText}\n请按上述 JSON 结构生成状态栏，只包含角色和NPC，绝不包含玩家。`
             }
           ]
         })
@@ -3249,6 +3437,28 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
       if (!parsed || !parsed.length) {
         setMessage('状态栏生成失败或格式不正确，可以稍后重试');
         return;
+      }
+
+      // 如果之前有行程安排，且剧情中没有明确提到行程变更，则保留之前的行程安排
+      if (Object.keys(previousSchedule).length > 0 && !hasScheduleChange) {
+        parsed = parsed.map((status) => {
+          const previous = previousSchedule[status.name];
+          if (previous && previous.length > 0) {
+            // 检查新生成的行程安排是否与之前的差异很大
+            const newScheduleStr = status.schedule.join('|').toLowerCase();
+            const previousScheduleStr = previous.join('|').toLowerCase();
+            
+            // 如果差异很大（相似度低于50%），则使用之前的行程安排
+            const similarity = calculateScheduleSimilarity(newScheduleStr, previousScheduleStr);
+            if (similarity < 0.5) {
+              return {
+                ...status,
+                schedule: previous
+              };
+            }
+          }
+          return status;
+        });
       }
 
       setStatusList(parsed);
