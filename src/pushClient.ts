@@ -9,9 +9,9 @@ const VAPID_PUBLIC_KEY =
 
 // 后端推送服务地址：
 // - 本地开发：默认 http://localhost:4000（使用 push-server.js）
-// - 线上：默认使用 Cloudflare Workers 作为反向代理，避免直接连 vercel 在国内不稳定
-//   这里使用你在 Cloudflare 上创建的 Worker 域名
-const PROD_PUSH_BASE = 'https://wodexiaoshouji.lyx815934990.workers.dev';
+// - 线上：默认使用阿里云函数计算 FC 的 HTTP 公网地址作为后端
+//   这里使用你在阿里云上创建的函数 URL 公网访问地址
+const PROD_PUSH_BASE = 'https://mini-phone-push-mknmtsouvf.cn-hangzhou.fcapp.run';
 
 const PUSH_SERVER_BASE_URL =
   import.meta.env.VITE_PUSH_SERVER_BASE_URL ||
