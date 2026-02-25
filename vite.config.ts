@@ -1,8 +1,8 @@
 import react from '@vitejs/plugin-react-swc';
 import { defineConfig } from 'vite';
 
-// 为了让 Vercel 部署最简单可靠，这里统一使用根路径 '/',
-// GitHub Pages 先不兼容，后面如果一定要用再单独处理。
+// 先把 Vercel 部署搞稳定：统一使用根路径 '/'。
+// GitHub Pages 先不兼容，后续如果需要再单独处理。
 export default defineConfig({
   plugins: [react()],
   base: '/',
