@@ -1,16 +1,11 @@
 import react from '@vitejs/plugin-react-swc';
 import { defineConfig } from 'vite';
 
-// 在 Vercel 上部署时，应用直接挂在根路径 '/'，
-// 在 GitHub Pages 上则挂在 '/wodexiaoshouji/' 子路径。
-// 这里不用直接访问 process.env，避免本地 TS 报错，
-// 而是让 Vite 在构建时通过环境变量注入一个布尔值。
-const isVercel = process.env.VERCEL === '1';
-
+// 为了让 Vercel 部署最简单可靠，这里统一使用根路径 '/',
+// GitHub Pages 先不兼容，后面如果一定要用再单独处理。
 export default defineConfig({
   plugins: [react()],
-  // Vercel 环境下 base 为根路径，其它环境（本地开发 / GitHub Pages）使用子路径
-  base: isVercel ? '/' : '/wodexiaoshouji/',
+  base: '/',
   server: {
     host: true, // 允许局域网访问
     port: 5173,
