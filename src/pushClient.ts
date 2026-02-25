@@ -9,7 +9,8 @@ const VAPID_PUBLIC_KEY =
 
 // 后端推送服务地址：
 // - 本地开发：默认 http://localhost:4000（使用 push-server.js）
-// - 线上：固定调用 Vercel 上的后端域名，或者通过环境变量覆盖
+// - 线上：默认直接使用 Vercel 后端域名（你现在的项目：wodexiaoshouji.vercel.app）
+//   如需改成自己的域名，可以在 .env 中设置 VITE_PUSH_SERVER_BASE_URL
 const PUSH_SERVER_BASE_URL =
   import.meta.env.VITE_PUSH_SERVER_BASE_URL ||
   (import.meta.env.DEV ? 'http://localhost:4000' : 'https://wodexiaoshouji.vercel.app');
