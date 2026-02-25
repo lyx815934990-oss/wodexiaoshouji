@@ -5,6 +5,10 @@
 const VAPID_PUBLIC_KEY =
   'BJOFT35nXTBG6xil5t5kPLOnyZvlGomKDST5TVTtP2WqQOE3xqj8vSmsUdOqNXq4czdKsJcAINr6mL12C5VyVIc';
 
+// 推送服务端地址：开发环境默认 http://localhost:4000，生产环境从 Vite 环境变量读取
+const PUSH_SERVER_BASE_URL =
+  import.meta.env.VITE_PUSH_SERVER_BASE_URL || 'http://localhost:4000';
+
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -74,11 +78,16 @@ export async function enablePushNotifications() {
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
     });
 
-    // 4. 把 subscription 上传到你的后端（示例接口，需要你自己实现）
-    await fetch('/api/save-subscription', {
+    // 4. 把 subscription 发送给推送服务器，让服务器立即发一条测试通知
+    await fetch(`${PUSH_SERVER_BASE_URL}/api/push`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(subscription)
+      body: JSON.stringify({
+        subscription,
+        title: '小手机系统通知已开启',
+        body: '以后角色给你发消息时，我会通过系统通知提醒你~',
+        url: '/'
+      })
     });
 
     alert('系统消息提醒已开启');

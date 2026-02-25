@@ -2611,23 +2611,10 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
         setBusyInfo(null);
         // 先生成微信回复，然后将回复内容传递给剧情生成，确保一致性
         generateWeChatReply(unprocessedMessages, role)
-          .then(async ({ replies, noReplyReason, busyMinutes }) => {
+          .then(async ({ replies, noReplyReason }) => {
             let allReplyTexts = '';
 
-            if (typeof busyMinutes === 'number' && busyMinutes > 0 && (!replies || replies.length === 0)) {
-              // 模型判断角色此刻在忙：不发送微信消息，仅弹出“对方在忙”提示，并根据模型给出的分钟数计算预计结束时间
-              const roleDisplayName = role.wechatNickname || role.name;
-              const busyUntil = Date.now() + busyMinutes * 60 * 1000;
-              setBusyInfo({
-                roleName: roleDisplayName,
-                untilTimestamp: busyUntil
-              });
-              console.log(
-                '[WeChatApp] 本轮为忙碌状态，不发送微信消息，仅提示玩家忙碌，预计分钟数:',
-                busyMinutes
-              );
-              allReplyTexts = ''; // 剧情侧可以根据没有微信回复自行处理
-            } else if (noReplyReason && (!replies || replies.length === 0)) {
+            if (noReplyReason && (!replies || replies.length === 0)) {
               // 模型根据人设选择已读不回：不添加任何新消息，只弹出提示
               const roleDisplayName = role.wechatNickname || role.name;
               setNoReplyInfo({
@@ -2797,19 +2784,7 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
       .then(async ({ replies, noReplyReason, busyMinutes }) => {
         let allReplyTexts = '';
 
-        if (typeof busyMinutes === 'number' && busyMinutes > 0 && (!replies || replies.length === 0)) {
-          const roleDisplayName = role.wechatNickname || role.name;
-          const busyUntil = Date.now() + busyMinutes * 60 * 1000;
-          setBusyInfo({
-            roleName: roleDisplayName,
-            untilTimestamp: busyUntil
-          });
-          console.log(
-            '[WeChatApp] 本轮为忙碌状态（重新生成），不发送微信消息，只提示玩家忙碌，预计分钟数:',
-            busyMinutes
-          );
-          allReplyTexts = '';
-        } else if (noReplyReason && (!replies || replies.length === 0)) {
+        if (noReplyReason && (!replies || replies.length === 0)) {
           const roleDisplayName = role.wechatNickname || role.name;
           setNoReplyInfo({
             roleName: roleDisplayName,
@@ -8408,16 +8383,6 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
             </div>
           ) : meSettingsView === 'storage' ? (
             <div className="wechat-settings">
-              <div className="wechat-settings-header">
-                <button
-                  type="button"
-                  className="wechat-settings-back"
-                  onClick={() => setMeSettingsView('list')}
-                >
-                  ‹
-                </button>
-                <div className="wechat-settings-title">存储空间</div>
-              </div>
               <div className="wechat-settings-body">
                 <div className="wechat-settings-section">
                   <div style={{ padding: '12px 16px', fontSize: 13, color: '#6b7280' }}>
