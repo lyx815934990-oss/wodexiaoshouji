@@ -1,11 +1,9 @@
 import React from 'react';
 import { ApiSettingsApp } from './apps/ApiSettingsApp';
-import { StoryApp } from './apps/StoryApp';
 import { WeChatApp } from './apps/WeChatApp';
 import { AiPhoneIcon } from './icons/AiPhoneIcon';
 import { ApiSettingsIcon } from './icons/ApiSettingsIcon';
 import { AppearanceIcon } from './icons/AppearanceIcon';
-import { StoryIcon } from './icons/StoryIcon';
 import { TaobaoIcon } from './icons/TaobaoIcon';
 import { WaimaiIcon } from './icons/WaimaiIcon';
 import { WeiboIcon } from './icons/WeiboIcon';
@@ -17,18 +15,10 @@ type AppId =
   | 'taobao'
   | 'api-settings'
   | 'appearance'
-  | 'story'
   | null;
 
 export const App: React.FC = () => {
   const [activeApp, setActiveApp] = React.useState<AppId>(null);
-  const [storyTitle, setStoryTitle] = React.useState('线下故事');
-  const [storyHeaderActions, setStoryHeaderActions] = React.useState<{
-    showBack?: boolean;
-    showMore?: boolean;
-    onBack?: () => void;
-    onMore?: () => void;
-  }>({});
 
   const now = React.useMemo(() => {
     const d = new Date();
@@ -50,22 +40,6 @@ export const App: React.FC = () => {
 
   const handleBackToDesktop = () => {
     setActiveApp(null);
-    setStoryTitle('线下故事');
-    setStoryHeaderActions({});
-  };
-
-  const handleStoryBack = () => {
-    if (storyHeaderActions.onBack) {
-      storyHeaderActions.onBack();
-    } else {
-      handleBackToDesktop();
-    }
-  };
-
-  const handleStoryMore = () => {
-    if (storyHeaderActions.onMore) {
-      storyHeaderActions.onMore();
-    }
   };
 
   return (
@@ -143,37 +117,28 @@ export const App: React.FC = () => {
               </div>
               <span className="app-label">外观</span>
             </button>
-
-            <button
-              type="button"
-              className="app-icon-wrapper"
-              onClick={() => handleOpen('story')}
-            >
-              <div className="app-icon">
-                <StoryIcon />
-              </div>
-              <span className="app-label">线下故事</span>
-            </button>
           </div>
         </div>
 
         {activeApp &&
           (activeApp === 'ai' ? (
             <div className="app-window app-window-full">
-              <WeChatApp onExit={handleBackToDesktop} />
+              <WeChatApp
+                onExit={handleBackToDesktop}
+                onOpenApiSettings={() => handleOpen('api-settings')}
+              />
             </div>
           ) : (
             <div className="app-window">
               <div
-                className={`app-header ${activeApp === 'api-settings' || activeApp === 'story' ? 'app-header-center' : ''
-                  }`}
+                className={`app-header ${activeApp === 'api-settings' ? 'app-header-center' : ''}`}
               >
                 <div>
-                  {(activeApp === 'story' || activeApp === 'api-settings') && (
+                  {activeApp === 'api-settings' && (
                     <button
                       type="button"
                       className="app-back-left"
-                      onClick={activeApp === 'story' && storyHeaderActions.showBack ? handleStoryBack : handleBackToDesktop}
+                      onClick={handleBackToDesktop}
                     >
                       {'<'}
                     </button>
@@ -184,26 +149,14 @@ export const App: React.FC = () => {
                     {activeApp === 'taobao' && '淘宝'}
                     {activeApp === 'api-settings' && 'API 设置'}
                     {activeApp === 'appearance' && '外观设置'}
-                    {activeApp === 'story' && storyTitle}
                   </div>
-                  {activeApp !== 'story' && (
-                    <div className="app-subtitle">
-                      {activeApp === 'api-settings'
-                        ? '管理 AI 接口地址、Key 与模型，用于全局生文功能'
-                        : '即将接入的功能区域'}
-                    </div>
-                  )}
+                  <div className="app-subtitle">
+                    {activeApp === 'api-settings'
+                      ? '管理 AI 接口地址、Key 与模型，用于全局生文功能'
+                      : '即将接入的功能区域'}
+                  </div>
                 </div>
-                {activeApp === 'story' && storyHeaderActions.showMore && (
-                  <button
-                    type="button"
-                    className="app-more"
-                    onClick={handleStoryMore}
-                  >
-                    ⋯
-                  </button>
-                )}
-                {activeApp !== 'story' && activeApp !== 'api-settings' && (
+                {activeApp !== 'api-settings' && (
                   <button
                     type="button"
                     className="app-back"
@@ -216,8 +169,6 @@ export const App: React.FC = () => {
 
               {activeApp === 'api-settings' ? (
                 <ApiSettingsApp />
-              ) : activeApp === 'story' ? (
-                <StoryApp onTitleChange={setStoryTitle} onHeaderActionsChange={setStoryHeaderActions} />
               ) : (
                 <div className="app-content-placeholder">
                   {activeApp === 'weibo' && '这里将是 简化版微博时间线'}

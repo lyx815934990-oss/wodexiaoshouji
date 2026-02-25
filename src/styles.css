@@ -346,14 +346,14 @@ body {
 
 .wechat-chat {
   flex: 1;
-  padding: 8px 10px 12px;
+  padding: 10px 14px 16px;
   overflow-y: auto;
   background: url('../image/默认壁纸1.png') center center / cover no-repeat;
 }
 
 .wechat-chat-time {
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
   color: #9ca3af;
   margin: 4px 0 10px;
   background-color: rgba(255, 255, 255, 0.7);
@@ -368,7 +368,7 @@ body {
 .wechat-row {
   display: flex;
   align-items: flex-start;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .wechat-row-other {
@@ -380,14 +380,14 @@ body {
 }
 
 .wechat-avatar {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   border-radius: 6px;
   background: #e5e5e5;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 14px;
   color: #111827;
   margin: 0 6px;
   flex-shrink: 0;
@@ -410,10 +410,10 @@ body {
 }
 
 .wechat-bubble {
-  max-width: 70%;
-  padding: 8px 10px;
+  max-width: 72%;
+  padding: 10px 12px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.4;
   position: relative;
 }
@@ -452,6 +452,525 @@ body {
   border-left: 6px solid #111827;
 }
 
+/* 表情消息：去掉聊天气泡的小三角指向 */
+.wechat-bubble-no-tail.wechat-bubble-other::before,
+.wechat-bubble-no-tail.wechat-bubble-self::after {
+  display: none;
+}
+
+/* Lumi 红包打开弹窗 */
+.lumi-redpacket-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.lumi-redpacket-container {
+  width: 82%;
+  max-width: 360px;
+  border-radius: 18px;
+  background: #ff553f;
+  padding: 28px 16px 30px;
+  min-height: 520px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+  color: #fff;
+  transform-origin: center;
+  animation: lumi-redpacket-pop 220ms cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+.lumi-redpacket-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 30px;
+  margin-bottom: 16px;
+}
+
+.lumi-redpacket-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.lumi-redpacket-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 600;
+  font-size: 20px;
+}
+
+.lumi-redpacket-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@keyframes lumi-redpacket-pop {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.lumi-redpacket-sender-name {
+  font-size: 16px;
+  opacity: 1;
+  color: #fdcb6e;
+}
+
+.lumi-redpacket-note {
+  font-size: 22px;
+  font-weight: 600;
+  margin-top: 10px;
+  color: #fdcb6e;
+  text-align: center;
+}
+
+.lumi-redpacket-open-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 200px 0 4px;
+}
+
+.lumi-redpacket-coin {
+  width: 88px;
+  height: 88px;
+  border-radius: 999px;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  background: radial-gradient(circle at 30% 20%, #ffeaa7, #fdcb6e);
+  box-shadow: 0 8px 14px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center;
+  transform-style: preserve-3d;
+}
+
+.lumi-redpacket-coin-symbol {
+  font-size: 32px;
+  font-weight: 700;
+  color: #444444;
+}
+
+@keyframes lumi-redpacket-coin-spin {
+  0% {
+    transform: rotateY(0deg);
+  }
+  100% {
+    transform: rotateY(720deg);
+  }
+}
+
+.lumi-redpacket-coin-spinning {
+  animation: lumi-redpacket-coin-spin 1.2s ease-out forwards;
+}
+
+.lumi-redpacket-open-tip {
+  font-size: 13px;
+  opacity: 0.92;
+}
+
+.lumi-redpacket-detail-page {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background-color: #fdfdfd;
+  display: flex;
+  flex-direction: column;
+}
+
+.lumi-redpacket-detail-top {
+  position: relative;
+  height: 150px;
+  background-color: #ff553f;
+  border-bottom-left-radius: 50% 48px;
+  border-bottom-right-radius: 50% 48px;
+}
+
+.lumi-redpacket-detail-nav {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.lumi-redpacket-detail-back,
+.lumi-redpacket-detail-nav-more {
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.lumi-redpacket-detail-nav-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.lumi-redpacket-detail-main {
+  flex: 1;
+  padding: 40px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.lumi-redpacket-detail-sender-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.lumi-redpacket-detail-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: #111827;
+}
+
+.lumi-redpacket-detail-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lumi-redpacket-detail-sender-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.lumi-redpacket-detail-sender-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.lumi-redpacket-detail-note-line {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #9ca3af;
+  text-align: center;
+}
+
+.lumi-redpacket-detail-pending-line {
+  margin-top: 40px;
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+.lumi-redpacket-detail-pending-footer {
+  margin-top: auto;
+  padding-bottom: 32px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.lumi-redpacket-detail-amount-block {
+  display: flex;
+  align-items: baseline;
+  margin: 28px 0 6px;
+  color: #d1b27c;
+}
+
+.lumi-redpacket-detail-amount-currency {
+  font-size: 22px;
+  margin-right: 4px;
+}
+
+.lumi-redpacket-detail-amount-value {
+  font-size: 48px;
+  font-weight: 600;
+}
+
+.lumi-redpacket-detail-amount-unit {
+  font-size: 18px;
+  margin-left: 4px;
+}
+
+.lumi-redpacket-detail-tip {
+  font-size: 14px;
+  color: #9ca3af;
+  margin-top: 6px;
+}
+
+.lumi-redpacket-detail-record {
+  width: 100%;
+  margin-top: 40px;
+  border-top: 1px solid #f3f4f6;
+  padding-top: 12px;
+}
+
+.lumi-redpacket-detail-record-header {
+  font-size: 13px;
+  color: #9ca3af;
+  margin-bottom: 8px;
+}
+
+.lumi-redpacket-detail-record-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.lumi-redpacket-detail-record-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  overflow: hidden;
+  background-color: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.lumi-redpacket-detail-record-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lumi-redpacket-detail-record-info {
+  flex: 1;
+  margin-left: 10px;
+}
+
+.lumi-redpacket-detail-record-name {
+  font-size: 15px;
+  color: #111827;
+}
+
+.lumi-redpacket-detail-record-time {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.lumi-redpacket-detail-record-amount {
+  font-size: 15px;
+  color: #111827;
+}
+
+/* 微信红包记录页（收到的红包） */
+.lumi-redpacket-record-page {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background-color: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+}
+
+.lumi-redpacket-record-top {
+  background-color: #ff553f;
+  padding: 52px 16px 10px;
+  color: #ffffff;
+}
+
+.lumi-redpacket-record-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lumi-redpacket-record-close,
+.lumi-redpacket-record-nav-more {
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.lumi-redpacket-record-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.lumi-redpacket-record-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.lumi-redpacket-record-sender {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.lumi-redpacket-record-sender-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lumi-redpacket-record-sender-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #111827;
+}
+
+.lumi-redpacket-record-sender-sub {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.lumi-redpacket-record-sender-one-line {
+  font-size: 15px;
+  font-weight: 500;
+  color: #111827;
+}
+
+.lumi-redpacket-record-year-wrapper {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.lumi-redpacket-record-year-btn {
+  border: none;
+  background: transparent;
+  color: #facc6b;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.lumi-redpacket-record-year-arrow {
+  font-size: 11px;
+}
+
+.lumi-redpacket-record-year-dropdown {
+  position: absolute;
+  right: 0;
+  top: 26px;
+  min-width: 80px;
+  background: #ffffff;
+  color: #111827;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+  overflow: hidden;
+  z-index: 10;
+}
+
+.lumi-redpacket-record-year-option {
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.lumi-redpacket-record-year-option:hover {
+  background-color: #f3f4f6;
+}
+
+.lumi-redpacket-record-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background-color: #f5f5f5;
+}
+
+.lumi-redpacket-record-summary {
+  background-color: #f5f5f5;
+  padding: 24px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.lumi-redpacket-record-summary-amount {
+  font-size: 40px;
+  font-weight: 600;
+  color: #111827;
+  margin-top: 6px;
+}
+
+.lumi-redpacket-record-summary-row {
+  margin-top: 18px;
+  display: flex;
+  width: 100%;
+  justify-content: space-around;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.lumi-redpacket-record-summary-number {
+  font-size: 18px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.lumi-redpacket-record-summary-row > div {
+  text-align: center;
+}
+
+.lumi-redpacket-record-list {
+  margin-top: 8px;
+  background-color: #ffffff;
+}
+
+.lumi-redpacket-record-empty {
+  padding: 40px 0;
+  text-align: center;
+  font-size: 14px;
+  color: #9ca3af;
+}
+
 /* 系统消息样式 */
 .wechat-system-message-wrapper {
   display: flex;
@@ -483,7 +1002,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: transparent;
+  background: #f9fafb; /* 底部输入区域保持浅底色，避免看起来像透明 */
   position: relative;
   border-top: none;
 }
@@ -948,6 +1467,14 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 14px;
+  overflow: hidden;
+}
+
+.wechat-contacts-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
 }
 
 .wechat-contacts-name {
@@ -1604,12 +2131,17 @@ body {
 }
 
 .story-read-input-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   border-radius: 24px;
   border-top-left-radius: 0;
   border-top-right-radius: 0;
   background: #f5f5f5;
   padding: 8px 10px 10px;
   box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.08);
+  z-index: 100;
 }
 
 .story-read-tools {
@@ -2068,6 +2600,14 @@ body {
   font-size: 20px;
 }
 
+.wechat-me-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+  display: block;
+}
+
 .wechat-me-info {
   display: flex;
   flex-direction: column;
@@ -2118,14 +2658,297 @@ body {
   color: #111827;
 }
 
-.wechat-conv {
+/* 微信“我”-设置页 */
+.wechat-settings {
+  flex: 1;
+  background: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+}
+
+.wechat-settings-header {
+  height: 44px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f9f9f9;
+  border-bottom: 1px solid #e5e5e5;
+  position: relative;
+}
+
+.wechat-settings-back {
+  position: absolute;
+  left: 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px;
+  color: #111827;
+}
+
+.wechat-settings-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.wechat-settings-body {
+  flex: 1;
+  padding-top: 8px;
+  overflow-y: auto;
+}
+
+.wechat-settings-section {
+  background: #ffffff;
+  margin-bottom: 8px;
+}
+
+.wechat-settings-item {
   width: 100%;
-  padding: 10px 12px;
+  min-height: 48px;
+  padding: 12px 16px;
   border: none;
   background: transparent;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  font-size: 15px;
+  color: #111827;
+  cursor: pointer;
+}
+
+.wechat-settings-item + .wechat-settings-item {
+  border-top: 1px solid #f3f4f6;
+}
+
+.wechat-settings-item-arrow {
+  font-size: 18px;
+  color: #d1d5db;
+}
+
+.wechat-profile-settings-body {
+  padding-top: 8px;
+}
+
+.wechat-profile-section {
+  background: #ffffff;
+  margin-bottom: 8px;
+}
+
+.wechat-profile-row {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.wechat-profile-row + .wechat-profile-row {
+  border-top: 1px solid #f3f4f6;
+}
+
+.wechat-profile-row-avatar {
+  min-height: 72px;
+}
+
+.wechat-profile-label {
+  font-size: 15px;
+  color: #111827;
+}
+
+.wechat-profile-value {
+  display: flex;
+  align-items: center;
   gap: 10px;
+}
+
+.wechat-profile-value-text {
+  font-size: 15px;
+  color: #6b7280;
+}
+
+.wechat-profile-avatar-thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 20px;
+  color: #111827;
+}
+
+.wechat-profile-avatar-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wechat-profile-edit-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1400;
+}
+
+.wechat-profile-edit-panel {
+  width: 86%;
+  max-width: 360px;
+  background: #ffffff;
+  border-radius: 16px;
+  padding-bottom: 12px;
+}
+
+.wechat-profile-edit-header {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.wechat-profile-edit-cancel,
+.wechat-profile-edit-done {
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.wechat-profile-edit-cancel {
+  color: #6b7280;
+}
+
+.wechat-profile-edit-done {
+  color: #111827;
+}
+
+.wechat-profile-edit-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.wechat-profile-edit-body {
+  padding: 12px 16px 16px;
+}
+
+.wechat-profile-edit-input {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  padding: 8px 10px;
+  font-size: 15px;
+  color: #111827;
+  outline: none;
+}
+
+.wechat-profile-edit-input:focus {
+  border-color: #111827;
+}
+
+.wechat-profile-edit-textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.wechat-profile-edit-avatar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wechat-profile-edit-avatar-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wechat-profile-edit-avatar-preview {
+  width: 60px;
+  height: 60px;
+  border-radius: 14px;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 22px;
+  color: #111827;
+}
+
+.wechat-profile-edit-avatar-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wechat-profile-edit-avatar-text {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.wechat-profile-edit-avatar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wechat-profile-edit-avatar-upload-btn {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  font-size: 12px;
+  color: #111827;
+  cursor: pointer;
+}
+
+.wechat-profile-edit-gender-group {
+  padding: 12px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wechat-profile-edit-gender-btn {
+  width: 100%;
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  font-size: 15px;
+  color: #111827;
+  cursor: pointer;
+  text-align: left;
+  padding: 8px 12px;
+}
+
+.wechat-profile-edit-gender-btn.active {
+  border-color: #111827;
+  background: #e5e7eb;
+}
+
+.wechat-conv {
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 14px;
   cursor: pointer;
 }
 
@@ -2134,8 +2957,8 @@ body {
 }
 
 .wechat-conv-avatar {
-  width: 40px;
-  height: 40px;
+  width: 52px;
+  height: 52px;
   border-radius: 8px;
   background: #111827;
   color: #f9fafb;
@@ -2165,7 +2988,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .wechat-conv-name {
@@ -2175,19 +2998,19 @@ body {
 
 .wechat-conv-time {
   color: #9ca3af;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .wechat-conv-bottom {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 12px;
+  font-size: 14px;
   color: #6b7280;
 }
 
 .wechat-conv-preview {
-  max-width: 220px;
+  max-width: 260px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2206,8 +3029,12 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: space-around;
-  position: relative;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   padding-top: 8px;
+  z-index: 100;
 }
 
 .wechat-tabs::before {

@@ -24,6 +24,8 @@ type StoryRole = {
   // 联系方式
   phoneNumber?: string; // 10位手机号
   wechatId?: string; // 微信号
+  // 角色所在地区（由 AI 根据世界书和人设总结）
+  region?: string;
   // 玩家联系方式（角色知道的）
   playerPhoneNumber?: string; // 玩家给角色的手机号
   playerWechatId?: string; // 玩家给角色的微信号
@@ -116,6 +118,8 @@ const loadApiConfig = (): ApiConfig => {
 const createId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 const IDENTITY_KEY = 'mini-ai-phone.story-identity';
+// 与微信侧约定的：每个角色下的玩家身份快照存储键（必须与 WeChatApp 中的常量保持一致）
+const WECHAT_ROLE_IDENTITY_KEY = 'mini-ai-phone.wechat-role-identity-per-role';
 
 const loadIdentity = (): PlayerIdentity => {
   try {
@@ -152,6 +156,34 @@ const loadIdentity = (): PlayerIdentity => {
 const saveIdentity = (id: PlayerIdentity) => {
   try {
     window.localStorage.setItem(IDENTITY_KEY, JSON.stringify(id));
+  } catch {
+    // ignore
+  }
+};
+
+// 读取某个角色在微信聊天中使用的玩家身份快照；如果不存在，则返回 null
+const loadWeChatIdentityForRole = (roleId: string): PlayerIdentity | null => {
+  try {
+    const raw = window.localStorage.getItem(WECHAT_ROLE_IDENTITY_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, PlayerIdentity> | null;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const id = parsed[roleId];
+    if (!id) return null;
+    return id;
+  } catch {
+    return null;
+  }
+};
+
+// 保存某个角色在微信聊天中使用的玩家身份快照
+const saveWeChatIdentityForRole = (roleId: string, id: PlayerIdentity) => {
+  if (!roleId) return;
+  try {
+    const raw = window.localStorage.getItem(WECHAT_ROLE_IDENTITY_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, PlayerIdentity>) : {};
+    parsed[roleId] = id;
+    window.localStorage.setItem(WECHAT_ROLE_IDENTITY_KEY, JSON.stringify(parsed));
   } catch {
     // ignore
   }
@@ -795,6 +827,15 @@ type StoryAppProps = {
     onBack?: () => void;
     onMore?: () => void;
   }) => void;
+  onNavigateToAddFriend?: () => void;
+  // 通知外部当前是否处于具体剧情阅读页，用于微信底部导航显示/隐藏
+  onReadModeChange?: (inRead: boolean) => void;
+  // 外部（例如微信聊天）请求直接打开“玩家身份”页并编辑某个角色下的玩家身份快照
+  identityEditRoleId?: string | null;
+  // 当 StoryApp 完成对 identityEditRoleId 的消费后，通知外部清理状态
+  onIdentityEditRoleHandled?: () => void;
+  // 当从聊天页跳转到玩家身份页并保存后，通知外部（通常是微信）可以返回聊天页
+  onExitIdentityFromChat?: () => void;
 };
 
 // 全局事件处理器：处理微信消息触发的剧情生成（不依赖React组件状态）
@@ -963,8 +1004,8 @@ const handleWeChatMessageStoryGlobally = async (event: CustomEvent<{ roleId: str
     // 保存到localStorage
     saveRoleChat(roleId, withAi);
 
-    // 从AI回复中提取微信消息并同步到微信聊天页面
-    extractAndSyncWeChatMessages(roleId, aiResponse);
+    // 已禁用：不再同步线下剧情到线上消息
+    // extractAndSyncWeChatMessages(roleId, aiResponse);
 
     // 触发UI更新事件
     window.dispatchEvent(new CustomEvent('story-updated', {
@@ -1182,8 +1223,8 @@ const handleFriendRequestGlobally = async (event: CustomEvent<{ roleId: string; 
     saveRoleChat(roleId, withAi);
     console.log('[StoryApp] [全局监听器] 已保存剧情到localStorage，总轮次:', withAi.length);
 
-    // 从AI回复中提取微信消息并同步到微信聊天页面
-    extractAndSyncWeChatMessages(roleId, aiResponse);
+    // 已禁用：不再同步线下剧情到线上消息
+    // extractAndSyncWeChatMessages(roleId, aiResponse);
 
     // 触发UI更新事件（如果组件已挂载）
     window.dispatchEvent(new CustomEvent('story-updated', {
@@ -1247,16 +1288,23 @@ if (typeof window !== 'undefined') {
   window.addEventListener('friend-request-sent', handleFriendRequestGlobally as unknown as EventListener);
   document.addEventListener('friend-request-sent', handleFriendRequestGlobally as unknown as EventListener);
   
-  console.log('[StoryApp] [模块初始化] 注册全局微信消息剧情生成事件监听器');
-  window.addEventListener('generate-story-for-wechat-message', handleWeChatMessageStoryGlobally as unknown as EventListener);
-  document.addEventListener('generate-story-for-wechat-message', handleWeChatMessageStoryGlobally as unknown as EventListener);
+  // 已禁用：不再同步线上消息到线下剧情
+  // console.log('[StoryApp] [模块初始化] 注册全局微信消息剧情生成事件监听器');
+  // window.addEventListener('generate-story-for-wechat-message', handleWeChatMessageStoryGlobally as unknown as EventListener);
+  // document.addEventListener('generate-story-for-wechat-message', handleWeChatMessageStoryGlobally as unknown as EventListener);
 }
 
-export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActionsChange }) => {
+export const StoryApp: React.FC<StoryAppProps> = ({
+  onTitleChange,
+  onHeaderActionsChange,
+  onNavigateToAddFriend,
+  onReadModeChange,
+  identityEditRoleId,
+  onIdentityEditRoleHandled,
+  onExitIdentityFromChat
+}) => {
   const [roles, setRoles] = React.useState<StoryRole[]>(() => loadRoles());
-  const [mode, setMode] = React.useState<'list' | 'create' | 'identity' | 'read' | 'edit' | 'appearance'>(
-    () => (loadRoles().length === 0 ? 'create' : 'list')
-  );
+  const [mode, setMode] = React.useState<'list' | 'create' | 'identity' | 'read' | 'edit' | 'appearance'>('list');
   const [name, setName] = React.useState('');
   const [gender, setGender] = React.useState<StoryRole['gender']>('');
   const [roleAge, setRoleAge] = React.useState('');
@@ -1268,6 +1316,45 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
   const [rolePhoneNumber, setRolePhoneNumber] = React.useState('');
   const [roleWechatId, setRoleWechatId] = React.useState('');
   const [message, setMessage] = React.useState<string | null>(null);
+  // 当前是否在为某个角色单独编辑「微信侧玩家身份」
+  const [editingIdentityRoleId, setEditingIdentityRoleId] = React.useState<string | null>(null);
+
+  // 来自微信侧的“为某个角色编辑玩家身份”请求：切换到玩家身份页，并尽量加载该角色下已有的身份快照
+  React.useEffect(() => {
+    if (!identityEditRoleId) return;
+
+    try {
+      setMode('identity');
+      setEditingIdentityRoleId(identityEditRoleId);
+
+      const perRoleIdentity = loadWeChatIdentityForRole(identityEditRoleId);
+      if (perRoleIdentity) {
+        // 如果该角色已经有单独的身份快照，则优先使用它
+        const merged: PlayerIdentity = {
+          name: perRoleIdentity.name || '',
+          gender: perRoleIdentity.gender || '',
+          intro: perRoleIdentity.intro || '',
+          tags: perRoleIdentity.tags || '',
+          worldbooks: perRoleIdentity.worldbooks ?? [],
+          phoneNumber: perRoleIdentity.phoneNumber,
+          wechatId: perRoleIdentity.wechatId
+        };
+        setIdentity(merged);
+        setPlayerWorldbooks(merged.worldbooks ?? []);
+      } else {
+        // 否则仍然使用全局玩家身份作为初始值
+        const globalIdentity = loadIdentity();
+        setIdentity(globalIdentity);
+        setPlayerWorldbooks(globalIdentity.worldbooks ?? []);
+      }
+
+      setMessage(`正在为角色的微信聊天编辑专属玩家身份，这里的修改只会影响该角色看到的你。`);
+    } finally {
+      if (onIdentityEditRoleHandled) {
+        onIdentityEditRoleHandled();
+      }
+    }
+  }, [identityEditRoleId, onIdentityEditRoleHandled]);
   const [openWorldbookIds, setOpenWorldbookIds] = React.useState<string[]>([]);
   const [openEntryIds, setOpenEntryIds] = React.useState<string[]>([]);
   const [identity, setIdentity] = React.useState<PlayerIdentity>(() => loadIdentity());
@@ -1313,6 +1400,21 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
       onTitleChange('线下故事');
     }
   }, [mode, currentRoleId, roles, onTitleChange]);
+
+  // 将是否处于「沉浸页面」通知给外部（用于控制微信底部导航：阅读/编辑/设定时隐藏）
+  React.useEffect(() => {
+    if (!onReadModeChange) return;
+    // read：剧情阅读页
+    // create / edit：角色创建与编辑页
+    // identity / appearance：玩家/角色设定编辑页
+    const inImmersive =
+      mode === 'read' ||
+      mode === 'create' ||
+      mode === 'edit' ||
+      mode === 'identity' ||
+      mode === 'appearance';
+    onReadModeChange(inImmersive);
+  }, [mode, onReadModeChange]);
 
   // 动态注入style标签以确保Safari PWA兼容性
   React.useEffect(() => {
@@ -1436,11 +1538,19 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
         }
       });
     } else if (mode === 'identity' || mode === 'appearance') {
-      // 身份设置模式或美化设置模式：如果有正在阅读的角色，返回阅读页；否则返回创建页
+      // 身份设置模式或美化设置模式：
+      // - 普通进入：如果有正在阅读的角色，返回阅读页；否则返回创建页
+      // - 从微信聊天进入并正在为某个角色编辑身份时：返回键直接退出到聊天页
       onHeaderActionsChange({
         showBack: true,
         showMore: false,
         onBack: () => {
+          if (mode === 'identity' && editingIdentityRoleId && onExitIdentityFromChat) {
+            // 从微信聊天进来的身份编辑：返回到聊天页
+            setEditingIdentityRoleId(null);
+            onExitIdentityFromChat();
+            return;
+          }
           // 如果有正在阅读的角色，返回到阅读页
           if (currentRoleId) {
             setMode('read');
@@ -1451,11 +1561,12 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
         }
       });
     }
-  }, [mode, currentRoleId, roles, onHeaderActionsChange]);
+  }, [mode, currentRoleId, roles, onHeaderActionsChange, editingIdentityRoleId, onExitIdentityFromChat]);
 
   // 当切换到identity模式时，同步加载玩家世界书
   React.useEffect(() => {
-    if (mode === 'identity') {
+    // 如果当前是在为某个角色单独编辑身份（从聊天页跳转），则不覆盖之前已经填充好的世界书
+    if (mode === 'identity' && !editingIdentityRoleId) {
       const loadedIdentity = loadIdentity();
       setPlayerWorldbooks(loadedIdentity.worldbooks ?? []);
       setOpenPlayerWorldbookIds((loadedIdentity.worldbooks ?? []).map((wb) => wb.id));
@@ -1463,7 +1574,7 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
         (loadedIdentity.worldbooks ?? []).flatMap((wb) => wb.entries.map((e) => e.id))
       );
     }
-  }, [mode]);
+  }, [mode, editingIdentityRoleId]);
 
   React.useEffect(() => {
     try {
@@ -1568,8 +1679,8 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
         saveRoleChat(roleId, withAi);
         console.log('[StoryApp] 已保存剧情到localStorage，总轮次:', withAi.length);
 
-        // 从AI回复中提取微信消息并同步到微信聊天页面
-        extractAndSyncWeChatMessages(roleId, aiResponse);
+        // 已禁用：不再同步线下剧情到线上消息
+        // extractAndSyncWeChatMessages(roleId, aiResponse);
 
         // 如果用户当前正在阅读该角色，更新UI状态
         if (isCurrentRole) {
@@ -1832,8 +1943,8 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
     reader.readAsDataURL(file);
   };
 
-  // 生成微信资料
-  const generateWeChatProfile = async (role: StoryRole): Promise<{ nickname?: string; signature?: string }> => {
+  // 生成微信资料（昵称 / 签名 / 微信号 / 地区）
+  const generateWeChatProfile = async (role: StoryRole): Promise<{ nickname?: string; signature?: string; wechatId?: string; region?: string }> => {
     const cfg = loadApiConfig();
     if (!cfg.baseUrl || !cfg.model) {
       return {};
@@ -1850,9 +1961,13 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
       const genderLabel = role.gender === 'male' ? '男' : role.gender === 'female' ? '女' : '其他';
       const ageLabel = role.age ? `${role.age}岁` : '年龄未指定';
       
-      // 获取角色世界书摘要
+      // 获取角色世界书摘要（供 AI 判断人设和可能的地区/生活圈）
       const worldbookSummary = role.worldbooks?.slice(0, 3).map(wb => {
-        const entries = wb.entries?.slice(0, 2).map((e: any) => e.title || '').filter(Boolean).join('、') || '';
+        const entries = wb.entries?.slice(0, 4).map((e: any) => {
+          const title = e.title || '';
+          const content = (e.content || '').slice(0, 40);
+          return content ? `${title}：${content}` : title;
+        }).filter(Boolean).join('；') || '';
         return entries ? `${wb.name}：${entries}` : '';
       }).filter(Boolean).join('；') || '';
 
@@ -1868,11 +1983,21 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
           messages: [
             {
               role: 'system',
-              content: '你是一个帮助生成微信个人资料的助手。根据角色信息生成符合人设的微信昵称和个性签名。要求：1）微信昵称要简洁、有个性，符合角色性格，长度2-8个字，**绝对不要使用角色的真实姓名**，要创造一个符合人设的昵称；2）个性签名要简短、有特色，体现角色的性格或态度，长度不超过20个字；3）直接输出JSON格式：{"nickname": "微信昵称", "signature": "个性签名"}，不要添加任何其他说明，不要使用markdown代码块。'
+              content:
+                '你是一个帮助生成微信个人资料的助手。现在需要你根据角色信息，生成符合人设的微信昵称、个性签名、微信号以及展示用的地区。\n' +
+                '要求：\n' +
+                '1）微信昵称：简洁有个性，符合角色性格，长度 2～8 个汉字；绝对不要直接使用角色真实姓名，要创造一个贴合人设的昵称。\n' +
+                '2）个性签名：简短、有特色，体现角色的性格或态度，长度不超过 20 个汉字。\n' +
+                '3）微信号(wechatId)：格式自然真实，尽量像真实玩家常用的号，例如 "wxid_xxx"、拼音+数字等；不要包含空格和中文，不要太长；要尽量和角色人设、昵称有点关联。\n' +
+                '4）地区(region)：从提供的世界书和设定里，推理出一个最贴合人设的常驻城市/地区，例如 "北京 海淀"、"重庆 巴南"、"上海 浦东"；如果设定里完全没有地区线索，可以根据角色氛围合理猜一个，但不要太冷门。\n' +
+                '5）直接输出 JSON 格式：{"nickname": "微信昵称", "signature": "个性签名", "wechatId": "微信号", "region": "地区"}，不要添加任何其他说明，不要使用 markdown 代码块。'
             },
             {
               role: 'user',
-              content: `角色姓名：${role.name}，性别：${genderLabel}，年龄：${ageLabel}。${worldbookSummary ? `角色设定：${worldbookSummary}。` : ''}请为这个角色生成一个符合人设的微信昵称（**不要使用角色真实姓名${role.name}**，要创造一个符合人设的昵称）和个性签名。`
+              content:
+                `角色姓名：${role.name}，性别：${genderLabel}，年龄：${ageLabel}。` +
+                `${worldbookSummary ? `以下是部分世界书/设定摘要，用于参考角色背景和生活环境：${worldbookSummary}。` : ''}` +
+                '请根据这些信息，生成符合以上要求的微信昵称、个性签名、微信号和地区，并按照要求的 JSON 格式返回。'
             }
           ]
         })
@@ -1893,19 +2018,25 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
       }
 
       // 尝试解析JSON
-      let parsed: { nickname?: string; signature?: string } = {};
+      let parsed: { nickname?: string; signature?: string; wechatId?: string; region?: string } = {};
       try {
         // 移除可能的markdown代码块标记
         text = text.replace(/^```json\n?/g, '').replace(/^```\n?/g, '').replace(/\n?```$/g, '').trim();
         parsed = JSON.parse(text);
       } catch {
-        // 如果解析失败，尝试提取昵称和签名（支持多种格式）
+        // 如果解析失败，尝试提取昵称/签名/微信号/地区（支持多种格式）
         const nicknameMatch = text.match(/["']nickname["']\s*:\s*["']([^"']+)["']/) || 
                               text.match(/nickname["']?\s*[:：]\s*["']?([^"',\n}]+)/);
         const signatureMatch = text.match(/["']signature["']\s*:\s*["']([^"']+)["']/) || 
                                text.match(/signature["']?\s*[:：]\s*["']?([^"',\n}]+)/);
+        const wechatIdMatch = text.match(/["']wechatId["']\s*:\s*["']([^"']+)["']/) ||
+                              text.match(/wechatId["']?\s*[:：]\s*["']?([^"',\n}]+)/i);
+        const regionMatch = text.match(/["']region["']\s*:\s*["']([^"']+)["']/) ||
+                            text.match(/region["']?\s*[:：]\s*["']?([^"',\n}]+)/i);
         if (nicknameMatch) parsed.nickname = nicknameMatch[1].trim();
         if (signatureMatch) parsed.signature = signatureMatch[1].trim();
+        if (wechatIdMatch) parsed.wechatId = wechatIdMatch[1].trim();
+        if (regionMatch) parsed.region = regionMatch[1].trim();
       }
 
       // 调试输出
@@ -1936,7 +2067,7 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
     
     // 检查是否有联系方式，如果有则生成微信资料
     const hasContact = (rolePhoneNumber.trim() || roleWechatId.trim());
-    let wechatProfile: { nickname?: string; signature?: string } = {};
+    let wechatProfile: { nickname?: string; signature?: string; wechatId?: string; region?: string } = {};
     
     if (hasContact) {
       setMessage('正在生成微信资料...');
@@ -1964,10 +2095,12 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
       worldbooks,
       // 保存联系方式
       phoneNumber: rolePhoneNumber.trim() || undefined,
-      wechatId: roleWechatId.trim() || undefined,
+      // 微信号优先使用 AI 生成结果，其次是手动填写
+      wechatId: (wechatProfile.wechatId?.trim() || roleWechatId.trim()) || undefined,
       // 保存微信资料
       wechatNickname: wechatProfile.nickname,
-      wechatSignature: wechatProfile.signature
+      wechatSignature: wechatProfile.signature,
+      region: wechatProfile.region?.trim() || undefined
     };
     
     // 如果是编辑模式，保留原有的微信资料（如果没有新生成且没有联系方式）
@@ -1980,6 +2113,9 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
         }
         if (!hasContact || !wechatProfile.signature) {
           newRole.wechatSignature = oldRole.wechatSignature;
+        }
+        if (!hasContact || !wechatProfile.region) {
+          newRole.region = oldRole.region;
         }
       }
     }
@@ -2026,9 +2162,23 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
       phoneNumber: identity.phoneNumber?.trim() || undefined,
       wechatId: identity.wechatId?.trim() || undefined
     };
+
+    // 始终更新全局玩家身份
     saveIdentity(trimmed);
+
     setIdentity(trimmed);
-    setMessage('玩家个人身份已保存（仅保存在本地浏览器）');
+
+    // 如果当前是从微信侧为某个角色单独编辑身份，则额外为该角色保存一份专属快照，并在保存后通知微信返回聊天页
+    if (editingIdentityRoleId) {
+      saveWeChatIdentityForRole(editingIdentityRoleId, trimmed);
+      setEditingIdentityRoleId(null);
+      setMessage('玩家个人身份已保存，并作为该角色微信聊天下的专属身份（仅保存在本地浏览器）。');
+      if (onExitIdentityFromChat) {
+        onExitIdentityFromChat();
+      }
+    } else {
+      setMessage('玩家个人身份已保存（仅保存在本地浏览器）。');
+    }
   };
 
   const handleAppearanceChange = (field: keyof StoryAppearance, value: string | number) => {
@@ -2867,8 +3017,8 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
       setStoryTurns(withAi);
       saveRoleChat(roleId, withAi);
 
-      // 从AI回复中提取微信消息并同步到微信聊天页面
-      extractAndSyncWeChatMessages(roleId, aiResponse);
+      // 已禁用：不再同步线下剧情到线上消息
+      // extractAndSyncWeChatMessages(roleId, aiResponse);
 
       // 检查AI回复中是否包含角色同意好友申请的内容
       checkAndProcessFriendRequest(roleId, aiResponse);
@@ -2989,8 +3139,8 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
       setStoryTurns(withNewResponse);
       saveRoleChat(currentRoleId, withNewResponse);
 
-      // 从AI回复中提取微信消息并同步到微信聊天页面
-      extractAndSyncWeChatMessages(currentRoleId, newResponse);
+      // 已禁用：不再同步线下剧情到线上消息
+      // extractAndSyncWeChatMessages(currentRoleId, newResponse);
 
       // 如果最后一轮是玩家输入，需要评估好感度
       if (turnsWithoutLast.length > 0) {
@@ -3064,8 +3214,8 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
       setStoryTurns(withAi);
       saveRoleChat(currentRoleId, withAi);
 
-      // 从AI回复中提取微信消息并同步到微信聊天页面
-      extractAndSyncWeChatMessages(currentRoleId, aiResponse);
+      // 已禁用：不再同步线下剧情到线上消息
+      // extractAndSyncWeChatMessages(currentRoleId, aiResponse);
 
       // 检查AI回复中是否包含角色同意好友申请的内容
       checkAndProcessFriendRequest(currentRoleId, aiResponse);
@@ -3527,33 +3677,62 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
     reader.readAsText(file, 'utf-8');
   };
 
+  // 没有角色时，引导玩家去添加朋友页面创建角色
+  if (roles.length === 0 && mode !== 'identity' && mode !== 'appearance') {
+    return (
+      <div className="story-app">
+        <div className="story-form" style={{ padding: '40px 20px', textAlign: 'center' }}>
+          <div style={{ fontSize: '18px', fontWeight: '500', marginBottom: '12px', color: '#333' }}>
+            还没有添加角色
+          </div>
+          <div style={{ fontSize: '14px', color: '#666', marginBottom: '24px', lineHeight: '1.6' }}>
+            请先在微信通讯录中点击「新的朋友」添加角色
+          </div>
+          {onNavigateToAddFriend && (
+            <button
+              type="button"
+              className="story-btn primary"
+              onClick={onNavigateToAddFriend}
+              style={{ padding: '12px 24px', fontSize: '16px' }}
+            >
+              去添加朋友
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (mode === 'identity') {
     return (
       <div className="story-app">
         <div className="story-form">
-          <div className="story-top-tabs">
-            <button
-              type="button"
-              className={`story-top-tab ${mode === 'create' ? 'active' : ''}`}
-              onClick={() => setMode('create')}
-            >
-              角色设定
-            </button>
-            <button
-              type="button"
-              className={`story-top-tab ${mode === 'identity' ? 'active' : ''}`}
-              onClick={() => setMode('identity')}
-            >
-              玩家身份
-            </button>
-            <button
-              type="button"
-              className={`story-top-tab ${mode === 'appearance' ? 'active' : ''}`}
-              onClick={() => setMode('appearance')}
-            >
-              美化
-            </button>
-          </div>
+          {/* 从微信侧跳转过来编辑某个角色的玩家身份时，只显示身份编辑单页，不展示顶部 Tab */}
+          {!editingIdentityRoleId && (
+            <div className="story-top-tabs">
+              <button
+                type="button"
+                className={`story-top-tab ${mode === 'create' ? 'active' : ''}`}
+                onClick={() => setMode('create')}
+              >
+                角色设定
+              </button>
+              <button
+                type="button"
+                className={`story-top-tab ${mode === 'identity' ? 'active' : ''}`}
+                onClick={() => setMode('identity')}
+              >
+                玩家身份
+              </button>
+              <button
+                type="button"
+                className={`story-top-tab ${mode === 'appearance' ? 'active' : ''}`}
+                onClick={() => setMode('appearance')}
+              >
+                美化
+              </button>
+            </div>
+          )}
           <div className="story-form-header-row">
             <div className="story-form-header">玩家个人身份</div>
           </div>
@@ -3596,27 +3775,6 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
           </div>
 
           <div className="story-row">
-            <label className="story-label">联系方式</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <input
-                className="story-input"
-                placeholder="手机号（10位数字，例如：1381234567）"
-                value={identity.phoneNumber || ''}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 10);
-                  handleIdentityChange('phoneNumber', value);
-                }}
-              />
-              <input
-                className="story-input"
-                placeholder="微信号（例如：wxid_abc123）"
-                value={identity.wechatId || ''}
-                onChange={(e) => handleIdentityChange('wechatId', e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="story-row">
             <label className="story-label">一句话自我介绍</label>
             <div className="story-entry-ai-row">
               <input
@@ -3633,16 +3791,6 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
                 AI 补全
               </button>
             </div>
-          </div>
-
-          <div className="story-row">
-            <label className="story-label">标签 / 关键词</label>
-            <textarea
-              className="story-textarea"
-              placeholder="可以简单写几条自己相关的关键词，供后续故事参考，例如：广州 / 文学 / 二次元 / 喜欢慢热日常"
-              value={identity.tags}
-              onChange={(e) => handleIdentityChange('tags', e.target.value)}
-            />
           </div>
 
           <div className="story-row">
@@ -3824,13 +3972,15 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
             >
               保存玩家身份
             </button>
-            <button
-              type="button"
-              className="story-btn"
-              onClick={() => setMode(roles.length ? 'list' : 'create')}
-            >
-              返回角色列表 / 角色创建
-            </button>
+            {!editingIdentityRoleId && (
+              <button
+                type="button"
+                className="story-btn"
+                onClick={() => setMode(roles.length ? 'list' : 'create')}
+              >
+                返回角色列表 / 角色创建
+              </button>
+            )}
           </div>
 
           {message && <div className="story-message">{message}</div>}
@@ -3970,7 +4120,7 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
     );
   }
 
-  if (mode === 'create' || mode === 'edit' || roles.length === 0) {
+  if (mode === 'create' || mode === 'edit') {
     return (
       <div className="story-app">
         <div className="story-form">
@@ -4385,7 +4535,7 @@ export const StoryApp: React.FC<StoryAppProps> = ({ onTitleChange, onHeaderActio
       const favorStageLabel = getFavorStageLabel(favorStage);
       
       return (
-        <div className="story-app">
+        <div className="story-app" style={{ paddingBottom: '200px' }}>
           <div 
             className="story-read"
             style={appearanceStyle}

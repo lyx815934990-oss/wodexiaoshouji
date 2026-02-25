@@ -43,7 +43,6 @@ export const ApiSettingsApp: React.FC = () => {
   const [models, setModels] = React.useState<string[]>(initial.models);
   const [testing, setTesting] = React.useState(false);
   const [message, setMessage] = React.useState<string | null>(null);
-  const [showModels, setShowModels] = React.useState(false);
 
   const handleSave = () => {
     const cfg: ApiConfig = {
@@ -145,46 +144,42 @@ export const ApiSettingsApp: React.FC = () => {
 
       <div className="api-section">
         <div className="api-row">
-          <label className="api-label">可用模型</label>
-        </div>
-        <button
-          type="button"
-          className="api-collapse-btn"
-          disabled={!models.length}
-          onClick={() => setShowModels((prev) => !prev)}
-        >
-          <span>{showModels ? '收起模型列表' : '展开模型列表'}</span>
-          <span className={`api-collapse-arrow ${showModels ? 'open' : ''}`}>⌄</span>
-        </button>
-        {models.length ? (
-          showModels && (
-            <div className="api-model-list">
-              {models.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={`api-model-item ${m === model ? 'active' : ''}`}
-                  onClick={() => setModel(m)}
-                >
-                  <span className="api-model-name">{m}</span>
-                  {m === model && <span className="api-model-badge">当前</span>}
-                </button>
-              ))}
-            </div>
-          )
-        ) : (
-          <div className="api-empty">暂未获取到模型，可以先直接填写模型名称后保存。</div>
-        )}
-
-        <div className="api-row">
           <label className="api-label">当前使用模型</label>
-          <input
-            className="api-input"
-            placeholder="例如：gpt-4.1-mini"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-          />
+          {models.length > 0 ? (
+            <select
+              className="api-input"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                fontSize: '14px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                backgroundColor: 'white',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="">请选择模型</option>
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              className="api-input"
+              placeholder="例如：gpt-4.1-mini（点击'测试连接并获取模型'可下拉选择）"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+            />
+          )}
         </div>
+        {models.length > 0 && (
+          <p className="api-tip" style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
+            已获取 {models.length} 个可用模型，可在上方下拉框中选择
+          </p>
+        )}
         <p className="api-tip">
           以上配置会被后续所有 AI 生文功能共用（例如：聊天、微博总结、外卖推荐、淘宝找货等）。
         </p>
