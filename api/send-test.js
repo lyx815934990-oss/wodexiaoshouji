@@ -1,13 +1,5 @@
-<<<<<<< HEAD:api/send-test.js
 // api/send-test.js
 // Vercel Node 无服务器环境下的 CommonJS 处理函数
-=======
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-// 注意：Vercel 的 Node 运行时默认按 CommonJS 加载 .js 文件
-// 这里使用 require 而不是 ES Module 的 import，避免 “Cannot use import statement outside a module”
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const webPush = require('web-push') as typeof import('web-push');
->>>>>>> 7e2e418b6be091582f23f2eb430cb76bc57e96b9:api/send-test.ts
 
 const store = require('./subscription-store');
 const webPush = require('web-push');
