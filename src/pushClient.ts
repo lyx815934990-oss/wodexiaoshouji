@@ -137,4 +137,39 @@ export const loadPushEnabledFromStorage = (): boolean => {
   return window.localStorage.getItem(STORAGE_KEY_ENABLED) === '1';
 };
 
+// 从当前设备直接触发一条测试推送（主要用于手机端自测）
+export const testPushFromThisDevice = async (): Promise<ToggleResult> => {
+  if (!isPushSupported()) {
+    return { ok: false, message: '当前浏览器不支持 Web Push，无法测试推送。' };
+  }
+
+  // 确保已经有订阅，没有则先尝试开启
+  const alreadyEnabled = await checkPushEnabled();
+  if (!alreadyEnabled) {
+    const r = await enablePush();
+    if (!r.ok) return r;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      return { ok: false, message: '未获取到订阅，请确认已开启「后台推送消息」。' };
+    }
+
+    await fetch(`${PUSH_SERVER_BASE_URL}/api/send-test`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ subscription })
+    });
+
+    return { ok: true, message: '已向本设备发送一条测试通知，请查看系统通知栏。' };
+  } catch (err) {
+    console.error('[pushClient] 本设备测试推送失败:', err);
+    return { ok: false, message: '测试推送失败，请稍后重试。' };
+  }
+};
+
 
