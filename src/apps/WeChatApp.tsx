@@ -72,25 +72,6 @@ const saveStoryRoles = (roles: StoryRole[]) => {
 
 const createId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-// Web Push 公钥（VAPID 公钥）占位符：
-// 实际使用时请替换成你自己服务器生成的 VAPID 公钥字符串。
-const VAPID_PUBLIC_KEY =
-  'BJs8iUAfccp2VEHmKB_jSPQoMfESbIqQ7augUO9vts_APKJizHrx-ADD2GPcJFA1e5LIICJOajclsXJeznYozas';
-
-// 把 base64 的 VAPID 公钥转换成 Uint8Array，供 pushManager.subscribe 使用
-const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-
-  for (let i = 0; i < rawData.length; i += 1) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-};
-
 // 随机姓名生成池（从StoryApp复制）
 const surnamePool = [
   '顾', '沈', '江', '陆', '言', '时', '程', '许', '林', '周', '傅', '岑', '苏', '席', '霍',
@@ -1049,10 +1030,6 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
   const [memorySettings, setMemorySettings] = React.useState<WeChatMemorySettings>(() =>
     loadWeChatMemorySettings()
   );
-  // 频率输入框的临时字符串值（允许用户删除为 "" 再输入）
-  const [memoryIntervalInput, setMemoryIntervalInput] = React.useState<string>(() =>
-    String(loadWeChatMemorySettings().summaryInterval)
-  );
   // 最近一次记忆总结的轻量提示
   const [memoryToast, setMemoryToast] = React.useState<{
     roleName: string;
@@ -1071,8 +1048,6 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
     onBack?: () => void;
     onMore?: () => void;
   }>({});
-  // Web Push / 通知开关状态提示
-  const [pushStatus, setPushStatus] = React.useState<string | null>(null);
 
   // 当离开线下剧情 Tab 时，重置阅读状态，确保其他 Tab 始终显示底部导航
   React.useEffect(() => {
@@ -1099,8 +1074,6 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
   // 持久化聊天记忆自动总结设置
   React.useEffect(() => {
     saveWeChatMemorySettings(memorySettings);
-    // 同步数字到输入框展示
-    setMemoryIntervalInput(String(memorySettings.summaryInterval));
   }, [memorySettings]);
 
   // 记忆提示自动消失
@@ -1113,59 +1086,6 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
       window.clearTimeout(timer);
     };
   }, [memoryToast]);
-
-  const handleEnablePushNotifications = React.useCallback(async () => {
-    try {
-      if (!('Notification' in window)) {
-        setPushStatus('当前浏览器不支持通知（Notification）。');
-        return;
-      }
-      if (!('serviceWorker' in navigator)) {
-        setPushStatus('当前环境未启用 Service Worker，无法注册推送。');
-        return;
-      }
-
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') {
-        setPushStatus('你没有允许通知，无法开启系统消息提醒。');
-        return;
-      }
-
-      const registration = await navigator.serviceWorker.ready;
-      if (!registration.pushManager) {
-        setPushStatus('当前 Service Worker 不支持 PushManager。');
-        return;
-      }
-
-      const existing = await registration.pushManager.getSubscription();
-      if (existing) {
-        setPushStatus('已存在推送订阅（控制台已打印订阅信息）。');
-        // 打印到控制台，方便你复制到服务器
-        // eslint-disable-next-line no-console
-        console.log('Existing push subscription:', JSON.stringify(existing));
-        return;
-      }
-
-      if (!VAPID_PUBLIC_KEY) {
-        setPushStatus('请先在代码中配置 VAPID 公钥（VAPID_PUBLIC_KEY），再重新尝试。');
-        return;
-      }
-
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-      });
-
-      setPushStatus('推送订阅成功！订阅详情已打印到控制台。');
-      // 打印到控制台，你可以把它发送到自己的服务器保存
-      // eslint-disable-next-line no-console
-      console.log('New push subscription:', JSON.stringify(subscription));
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('启用推送失败:', err);
-      setPushStatus('启用推送失败，请检查控制台错误信息。');
-    }
-  }, []);
 
   const handleClearAllChatMemories = React.useCallback(() => {
     clearAllChatMemories();
@@ -2030,7 +1950,7 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
   const generateWeChatReply = async (
     playerMessages: string[],
     role: StoryRole
-  ): Promise<{ replies: Array<{ text: string; isVoice: boolean; voiceDuration?: number; emojiName?: string }>; noReplyReason?: string; busyMinutes?: number }> => {
+  ): Promise<{ replies: Array<{ text: string; isVoice: boolean; voiceDuration?: number; emojiName?: string }>; noReplyReason?: string }> => {
     const cfg = loadApiConfig();
     if (!cfg.baseUrl || !cfg.model) {
       throw new Error('NO_API_CONFIG');
@@ -8572,25 +8492,10 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
                 </div>
 
                 <div className="wechat-settings-section">
-                  <button
-                    type="button"
-                    className="wechat-settings-item"
-                    onClick={handleEnablePushNotifications}
-                  >
-                    <span>通知 / Web Push 订阅</span>
+                  <button type="button" className="wechat-settings-item">
+                    <span>通知</span>
                     <span className="wechat-settings-item-arrow">›</span>
                   </button>
-                  {pushStatus && (
-                    <div
-                      style={{
-                        padding: '0 16px 12px',
-                        fontSize: 12,
-                        color: '#6b7280'
-                      }}
-                    >
-                      {pushStatus}
-                    </div>
-                  )}
                 </div>
 
                 <div className="wechat-settings-section">
@@ -8639,10 +8544,26 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
                           type="number"
                           min={1}
                           max={20}
-                          value={memoryIntervalInput}
+                          value={memorySettings.summaryInterval}
                           onChange={(e) => {
-                            // 直接按字符串存，允许中间态为 ""
-                            setMemoryIntervalInput(e.target.value);
+                            const value = e.target.value;
+                            if (value === '') {
+                              // 允许用户把数字暂时删空，等失焦或再次输入时再修正
+                              setMemorySettings((prev) => ({
+                                ...prev,
+                                summaryInterval: prev.summaryInterval
+                              }));
+                              return;
+                            }
+                            const raw = parseInt(value, 10);
+                            if (Number.isNaN(raw)) {
+                              return;
+                            }
+                            const safe = Math.max(1, Math.min(20, raw));
+                            setMemorySettings((prev) => ({
+                              ...prev,
+                              summaryInterval: safe
+                            }));
                           }}
                           onBlur={(e) => {
                             let value = parseInt(e.target.value || '0', 10);
@@ -8652,7 +8573,6 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
                               ...prev,
                               summaryInterval: safe
                             }));
-                            setMemoryIntervalInput(String(safe));
                           }}
                           style={{
                             width: 40,

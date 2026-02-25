@@ -3,9 +3,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react()],
-  // GitHub Pages 部署在 https://用户名.github.io/wodexiaoshouji/ 下
-  // 本地开发时 Vite 会自动用根路径，不受 base 影响
-  base: '/wodexiaoshouji/',
+  // base: '/wodexiaoshouji/', // 临时注释掉，方便本地测试
   server: {
     host: true, // 允许局域网访问
     port: 5173,
