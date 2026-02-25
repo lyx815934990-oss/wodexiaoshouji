@@ -14,6 +14,16 @@ const VAPID_PRIVATE_KEY =
 webPush.setVapidDetails('mailto:test@example.com', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
 module.exports = async function handler(req, res) {
+  // CORS 头
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
   // 允许通过 POST /api/send-test 时在 body.subscription 里直接传 subscription
   if (req.method === 'POST' && req.body && req.body.subscription) {
     store.setLatest(req.body.subscription);
