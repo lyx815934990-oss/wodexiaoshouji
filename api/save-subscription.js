@@ -4,6 +4,17 @@
 const store = require('./subscription-store');
 
 module.exports = function handler(req, res) {
+  // 基本 CORS 处理：允许前端（GitHub Pages / PWA）跨域调用
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // 预检请求直接返回 200
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
