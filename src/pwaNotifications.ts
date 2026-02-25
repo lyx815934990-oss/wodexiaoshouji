@@ -1,7 +1,9 @@
 // Safari PWA / Chrome 等浏览器中初始化 Web Push 订阅的帮助函数
 // 注意：真正发送推送需要你在服务端实现 Web Push（使用 VAPID 私钥）
 
-const VAPID_PUBLIC_KEY = '在这里填写你自己的 VAPID 公钥（Base64 / URL Safe Base64）';
+// 使用你生成的 VAPID 公钥（只放公钥，私钥务必只保存在服务器端）
+const VAPID_PUBLIC_KEY =
+  'BJOFT35nXTBG6xil5t5kPLOnyZvlGomKDST5TVTtP2WqQOE3xqj8vSmsUdOqNXq4czdKsJcAINr6mL12C5VyVIc';
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
