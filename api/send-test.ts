@@ -1,5 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import webPush from 'web-push';
+// 注意：Vercel 的 Node 运行时默认按 CommonJS 加载 .js 文件
+// 这里使用 require 而不是 ES Module 的 import，避免 “Cannot use import statement outside a module”
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const webPush = require('web-push') as typeof import('web-push');
 
 // 和 save-subscription 一样，这里只是 demo 级别的内存变量。
 // 真正上线请改成数据库存储，并按用户维度区分。
