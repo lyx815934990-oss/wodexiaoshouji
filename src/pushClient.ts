@@ -9,11 +9,13 @@ const VAPID_PUBLIC_KEY =
 
 // 后端推送服务地址：
 // - 本地开发：默认 http://localhost:4000（使用 push-server.js）
-// - 线上：默认直接使用 Vercel 后端域名（你现在的项目：wodexiaoshouji.vercel.app）
-//   如需改成自己的域名，可以在 .env 中设置 VITE_PUSH_SERVER_BASE_URL
+// - 线上：默认使用 Cloudflare Workers 作为反向代理，避免直接连 vercel 在国内不稳定
+//   这里使用你在 Cloudflare 上创建的 Worker 域名
+const PROD_PUSH_BASE = 'https://wodexiaoshouji.lyx815934990.workers.dev';
+
 const PUSH_SERVER_BASE_URL =
   import.meta.env.VITE_PUSH_SERVER_BASE_URL ||
-  (import.meta.env.DEV ? 'http://localhost:4000' : 'https://wodexiaoshouji.vercel.app');
+  (import.meta.env.DEV ? 'http://localhost:4000' : PROD_PUSH_BASE);
 
 const STORAGE_KEY_ENABLED = 'mini-ai-phone.push-enabled';
 
