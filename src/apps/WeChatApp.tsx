@@ -1007,6 +1007,8 @@ type WeChatAppProps = {
   onOpenApiSettings?: () => void;
 };
 
+import { enablePushNotifications } from '../pwaNotifications';
+
 export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings }) => {
   const [activeChatId, setActiveChatId] = React.useState<string | null>(null);
   const [activeTab, setActiveTab] = React.useState<TabId>('chat');
@@ -8492,10 +8494,27 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
                 </div>
 
                 <div className="wechat-settings-section">
-                  <button type="button" className="wechat-settings-item">
+                  <button
+                    type="button"
+                    className="wechat-settings-item"
+                    onClick={() => {
+                      // 在微信设置页中，点击“通知”直接尝试开启系统级通知（Web Push）
+                      void enablePushNotifications();
+                    }}
+                  >
                     <span>通知</span>
                     <span className="wechat-settings-item-arrow">›</span>
                   </button>
+                  <div
+                    style={{
+                      padding: '0 16px 12px',
+                      fontSize: 13,
+                      color: '#6b7280'
+                    }}
+                  >
+                    建议在 iPhone 上通过 Safari 将本站“添加到主屏幕”，
+                    然后从桌面图标进入再点击本开关，以开启系统级消息提醒。
+                  </div>
                 </div>
 
                 <div className="wechat-settings-section">
