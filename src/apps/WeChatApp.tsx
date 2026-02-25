@@ -8521,7 +8521,12 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
                         onChange={async (e) => {
                           if (pushBusy) return;
                           setPushBusy(true);
-                          setPushMessage(null);
+                          setPushMessage(e.target.checked ? '正在开启后台推送…' : '正在关闭后台推送…');
+                          // 防御性超时：如果网络异常导致 Promise 卡死，最多 12 秒自动解锁
+                          const safetyTimer = window.setTimeout(() => {
+                            setPushBusy(false);
+                            setPushMessage('操作超时，请检查网络后重试。');
+                          }, 12000);
                           try {
                             if (e.target.checked) {
                               const result = await enablePush();
@@ -8535,6 +8540,7 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
                               setPushMessage(result.message);
                             }
                           } finally {
+                            window.clearTimeout(safetyTimer);
                             setPushBusy(false);
                           }
                         }}
@@ -8570,11 +8576,16 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
                       onClick={async () => {
                         if (pushBusy) return;
                         setPushBusy(true);
-                        setPushMessage(null);
+                        setPushMessage('正在向本设备发送测试推送…');
+                        const safetyTimer = window.setTimeout(() => {
+                          setPushBusy(false);
+                          setPushMessage('测试操作超时，请检查网络后重试。');
+                        }, 12000);
                         try {
                           const result = await testPushFromThisDevice();
                           setPushMessage(result.message);
                         } finally {
+                          window.clearTimeout(safetyTimer);
                           setPushBusy(false);
                         }
                       }}
