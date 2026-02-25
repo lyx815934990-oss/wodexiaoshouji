@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build --outDir docs",
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx --max-warnings=0",
-    "deploy": "npm run build && gh-pages -d dist -b gh-pages -r https://github.com/lyx815934990-oss/wodexiaoshouji.git"
+    "deploy": "npm run build"
   },
   "dependencies": {
     "react": "^18.2.0",
