@@ -1,11 +1,12 @@
 import react from '@vitejs/plugin-react-swc';
 import { defineConfig } from 'vite';
 
-// 先把 Vercel 部署搞稳定：统一使用根路径 '/'。
-// GitHub Pages 先不兼容，后续如果需要再单独处理。
+// GitHub Pages 部署在 https://用户名.github.io/wodexiaoshouji/
+// 因此静态资源的前缀必须固定为 /wodexiaoshouji/
+// 本地开发时，请使用 http://localhost:5173/wodexiaoshouji/ 访问
 export default defineConfig({
   plugins: [react()],
-  base: '/',
+  base: '/wodexiaoshouji/',
   server: {
     host: true, // 允许局域网访问
     port: 5173,
