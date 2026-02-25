@@ -74,7 +74,8 @@ const createId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 // Web Push 公钥（VAPID 公钥）占位符：
 // 实际使用时请替换成你自己服务器生成的 VAPID 公钥字符串。
-const VAPID_PUBLIC_KEY = '';
+const VAPID_PUBLIC_KEY =
+  'BJs8iUAfccp2VEHmKB_jSPQoMfESbIqQ7augUO9vts_APKJizHrx-ADD2GPcJFA1e5LIICJOajclsXJeznYozas';
 
 // 把 base64 的 VAPID 公钥转换成 Uint8Array，供 pushManager.subscribe 使用
 const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
