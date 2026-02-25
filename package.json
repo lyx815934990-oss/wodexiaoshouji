@@ -7,8 +7,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx --max-warnings=0",
-    "deploy": "npm run build && gh-pages -d dist",
-    "push-server": "node push-server.js"
+    "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -20,12 +19,9 @@
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@vitejs/plugin-react-swc": "^3.7.0",
-    "body-parser": "^2.2.2",
-    "cors": "^2.8.6",
     "eslint": "^8.57.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
-    "express": "^5.2.1",
     "gh-pages": "^6.1.1",
     "typescript": "^5.6.0",
     "vite": "^5.0.0",

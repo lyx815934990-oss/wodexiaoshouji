@@ -1,4 +1,11 @@
 import React from 'react';
+import {
+  checkPushEnabled,
+  disablePush,
+  enablePush,
+  isPushSupported,
+  loadPushEnabledFromStorage
+} from '../pushClient';
 import { StoryApp } from './StoryApp';
 
 // 从剧情模式加载角色数据
@@ -1007,8 +1014,6 @@ type WeChatAppProps = {
   onOpenApiSettings?: () => void;
 };
 
-import { enablePushNotifications } from '../pwaNotifications';
-
 export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings }) => {
   const [activeChatId, setActiveChatId] = React.useState<string | null>(null);
   const [activeTab, setActiveTab] = React.useState<TabId>('chat');
@@ -1017,7 +1022,8 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
   // 「我」页：是否进入设置页
   const [showMeSettings, setShowMeSettings] = React.useState(false);
   // 「我」-设置子视图：list=设置列表，profile=个人资料，storage=存储空间
-  const [meSettingsView, setMeSettingsView] = React.useState<'list' | 'profile' | 'storage'>('list');
+  const [meSettingsView, setMeSettingsView] =
+    React.useState<'list' | 'profile' | 'storage' | 'notifications'>('list');
   type MeProfileFieldKey = 'avatar' | 'name' | 'gender' | 'region' | 'wechatId' | 'poke' | 'intro';
   const [meProfileEditingField, setMeProfileEditingField] = React.useState<MeProfileFieldKey | null>(null);
   const [meProfileEditText, setMeProfileEditText] = React.useState('');
@@ -1032,6 +1038,11 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
   const [memorySettings, setMemorySettings] = React.useState<WeChatMemorySettings>(() =>
     loadWeChatMemorySettings()
   );
+  // Web Push 推送设置
+  const [pushSupported] = React.useState(() => isPushSupported());
+  const [pushEnabled, setPushEnabled] = React.useState(() => loadPushEnabledFromStorage());
+  const [pushBusy, setPushBusy] = React.useState(false);
+  const [pushMessage, setPushMessage] = React.useState<string | null>(null);
   // 最近一次记忆总结的轻量提示
   const [memoryToast, setMemoryToast] = React.useState<{
     roleName: string;
@@ -1077,6 +1088,20 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
   React.useEffect(() => {
     saveWeChatMemorySettings(memorySettings);
   }, [memorySettings]);
+
+  // 初次进入时根据浏览器实际订阅状态校准推送开关
+  React.useEffect(() => {
+    if (!pushSupported) return;
+    checkPushEnabled()
+      .then((real) => {
+        if (real !== pushEnabled) {
+          setPushEnabled(real);
+        }
+      })
+      .catch(() => {
+        // ignore
+      });
+  }, [pushSupported, pushEnabled]);
 
   // 记忆提示自动消失
   React.useEffect(() => {
@@ -2611,10 +2636,23 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
         setBusyInfo(null);
         // 先生成微信回复，然后将回复内容传递给剧情生成，确保一致性
         generateWeChatReply(unprocessedMessages, role)
-          .then(async ({ replies, noReplyReason }) => {
+          .then(async ({ replies, noReplyReason, busyMinutes }) => {
             let allReplyTexts = '';
 
-            if (noReplyReason && (!replies || replies.length === 0)) {
+            if (typeof busyMinutes === 'number' && busyMinutes > 0 && (!replies || replies.length === 0)) {
+              // 模型判断角色此刻在忙：不发送微信消息，仅弹出“对方在忙”提示，并根据模型给出的分钟数计算预计结束时间
+              const roleDisplayName = role.wechatNickname || role.name;
+              const busyUntil = Date.now() + busyMinutes * 60 * 1000;
+              setBusyInfo({
+                roleName: roleDisplayName,
+                untilTimestamp: busyUntil
+              });
+              console.log(
+                '[WeChatApp] 本轮为忙碌状态，不发送微信消息，仅提示玩家忙碌，预计分钟数:',
+                busyMinutes
+              );
+              allReplyTexts = ''; // 剧情侧可以根据没有微信回复自行处理
+            } else if (noReplyReason && (!replies || replies.length === 0)) {
               // 模型根据人设选择已读不回：不添加任何新消息，只弹出提示
               const roleDisplayName = role.wechatNickname || role.name;
               setNoReplyInfo({
@@ -2784,7 +2822,19 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
       .then(async ({ replies, noReplyReason, busyMinutes }) => {
         let allReplyTexts = '';
 
-        if (noReplyReason && (!replies || replies.length === 0)) {
+        if (typeof busyMinutes === 'number' && busyMinutes > 0 && (!replies || replies.length === 0)) {
+          const roleDisplayName = role.wechatNickname || role.name;
+          const busyUntil = Date.now() + busyMinutes * 60 * 1000;
+          setBusyInfo({
+            roleName: roleDisplayName,
+            untilTimestamp: busyUntil
+          });
+          console.log(
+            '[WeChatApp] 本轮为忙碌状态（重新生成），不发送微信消息，只提示玩家忙碌，预计分钟数:',
+            busyMinutes
+          );
+          allReplyTexts = '';
+        } else if (noReplyReason && (!replies || replies.length === 0)) {
           const roleDisplayName = role.wechatNickname || role.name;
           setNoReplyInfo({
             roleName: roleDisplayName,
@@ -8383,6 +8433,16 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
             </div>
           ) : meSettingsView === 'storage' ? (
             <div className="wechat-settings">
+              <div className="wechat-settings-header">
+                <button
+                  type="button"
+                  className="wechat-settings-back"
+                  onClick={() => setMeSettingsView('list')}
+                >
+                  ‹
+                </button>
+                <div className="wechat-settings-title">存储空间</div>
+              </div>
               <div className="wechat-settings-body">
                 <div className="wechat-settings-section">
                   <div style={{ padding: '12px 16px', fontSize: 13, color: '#6b7280' }}>
@@ -8436,6 +8496,70 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
                 )}
               </div>
             </div>
+          ) : meSettingsView === 'notifications' ? (
+            <div className="wechat-settings">
+              <div className="wechat-settings-header">
+                <button
+                  type="button"
+                  className="wechat-settings-back"
+                  onClick={() => setMeSettingsView('list')}
+                >
+                  ‹
+                </button>
+                <div className="wechat-settings-title">新消息通知</div>
+              </div>
+              <div className="wechat-settings-body">
+                <div className="wechat-settings-section">
+                  <div className="wechat-settings-item">
+                    <span>后台推送消息</span>
+                    <label className="wechat-friend-request-switch" style={{ marginLeft: 'auto' }}>
+                      <input
+                        type="checkbox"
+                        checked={pushEnabled}
+                        disabled={!pushSupported || pushBusy}
+                        onChange={async (e) => {
+                          if (pushBusy) return;
+                          setPushBusy(true);
+                          setPushMessage(null);
+                          try {
+                            if (e.target.checked) {
+                              const result = await enablePush();
+                              setPushEnabled(result.ok);
+                              setPushMessage(result.message);
+                            } else {
+                              const result = await disablePush();
+                              if (result.ok) {
+                                setPushEnabled(false);
+                              }
+                              setPushMessage(result.message);
+                            }
+                          } finally {
+                            setPushBusy(false);
+                          }
+                        }}
+                      />
+                      <span className="wechat-friend-request-switch-slider" />
+                    </label>
+                  </div>
+                </div>
+
+                <div style={{ padding: '12px 16px', fontSize: 13, color: '#6b7280' }}>
+                  {!pushSupported && (
+                    <div style={{ marginBottom: 8 }}>
+                      当前浏览器不支持 Web Push。建议使用最新版桌面 Chrome / Edge，或在支持通知的手机浏览器中以
+                      「添加到主屏幕」的方式打开小手机。
+                    </div>
+                  )}
+                  <div>
+                    开启后，即使你切到别的标签页或把浏览器缩到后台，只要浏览器还在运行，就可以收到来自小手机的系统通知。
+                    记得在浏览器和系统设置中都允许「通知」权限。
+                  </div>
+                  {pushMessage && (
+                    <div style={{ marginTop: 8, fontSize: 12, color: '#4b5563' }}>{pushMessage}</div>
+                  )}
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="wechat-settings">
               <div className="wechat-settings-body">
@@ -8462,24 +8586,11 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
                   <button
                     type="button"
                     className="wechat-settings-item"
-                    onClick={() => {
-                      // 在微信设置页中，点击“通知”直接尝试开启系统级通知（Web Push）
-                      void enablePushNotifications();
-                    }}
+                    onClick={() => setMeSettingsView('notifications')}
                   >
                     <span>通知</span>
                     <span className="wechat-settings-item-arrow">›</span>
                   </button>
-                  <div
-                    style={{
-                      padding: '0 16px 12px',
-                      fontSize: 13,
-                      color: '#6b7280'
-                    }}
-                  >
-                    建议在 iPhone 上通过 Safari 将本站“添加到主屏幕”，
-                    然后从桌面图标进入再点击本开关，以开启系统级消息提醒。
-                  </div>
                 </div>
 
                 <div className="wechat-settings-section">

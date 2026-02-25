@@ -3,8 +3,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react()],
-  // GitHub Pages 项目站点需要设置 base，确保静态资源路径为 /wodexiaoshouji/...
-  base: '/wodexiaoshouji/',
+  // base: '/wodexiaoshouji/', // 临时注释掉，方便本地测试
   server: {
     host: true, // 允许局域网访问
     port: 5173,
