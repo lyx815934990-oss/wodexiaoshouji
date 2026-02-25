@@ -4,7 +4,8 @@ import {
   disablePush,
   enablePush,
   isPushSupported,
-  loadPushEnabledFromStorage
+  loadPushEnabledFromStorage,
+  testPushFromThisDevice
 } from '../pushClient';
 import { StoryApp } from './StoryApp';
 
@@ -1608,8 +1609,8 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
       redPacketRecordYear == null
         ? allReceivedRedPacketRecords
         : allReceivedRedPacketRecords.filter(
-            (item) => new Date(item.timestamp).getFullYear() === redPacketRecordYear
-          );
+          (item) => new Date(item.timestamp).getFullYear() === redPacketRecordYear
+        );
 
     const totalAmount = records.reduce((sum, item) => sum + item.amount, 0);
     const totalCount = records.length;
@@ -6692,67 +6693,67 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
               activeChat &&
               !isRedPacketDetailOpened &&
               (openingRedPacketMessage as any).from !== 'self' && (
-              <div
-                className="lumi-redpacket-overlay"
-                onClick={() => {
-                  setOpeningRedPacketMessage(null);
-                  setIsRedPacketDetailOpened(false);
-                  setIsRedPacketCoinAnimating(false);
-                }}
-              >
                 <div
-                  className={`lumi-redpacket-container ${isRedPacketDetailOpened ? 'lumi-redpacket-opened' : ''}`}
-                  onClick={(e) => e.stopPropagation()}
+                  className="lumi-redpacket-overlay"
+                  onClick={() => {
+                    setOpeningRedPacketMessage(null);
+                    setIsRedPacketDetailOpened(false);
+                    setIsRedPacketCoinAnimating(false);
+                  }}
                 >
-                  {/* 头部：头像 + 备注/昵称 */}
-                      <div className="lumi-redpacket-header">
-                    <div className="lumi-redpacket-header-top">
-                      <div className="lumi-redpacket-avatar">
-                        {openingRedPacketMessage.from === 'self' ? (
-                          playerAvatarUrl ? (
-                            <img src={playerAvatarUrl} alt={playerWechatNickname} />
+                  <div
+                    className={`lumi-redpacket-container ${isRedPacketDetailOpened ? 'lumi-redpacket-opened' : ''}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* 头部：头像 + 备注/昵称 */}
+                    <div className="lumi-redpacket-header">
+                      <div className="lumi-redpacket-header-top">
+                        <div className="lumi-redpacket-avatar">
+                          {openingRedPacketMessage.from === 'self' ? (
+                            playerAvatarUrl ? (
+                              <img src={playerAvatarUrl} alt={playerWechatNickname} />
+                            ) : (
+                              <span>{playerAvatarText}</span>
+                            )
+                          ) : activeChat.avatarUrl ? (
+                            <img src={activeChat.avatarUrl} alt={activeChat.name} />
                           ) : (
-                            <span>{playerAvatarText}</span>
-                          )
-                        ) : activeChat.avatarUrl ? (
-                          <img src={activeChat.avatarUrl} alt={activeChat.name} />
-                        ) : (
-                          <span>{activeChat.avatarText}</span>
-                        )}
+                            <span>{activeChat.avatarText}</span>
+                          )}
+                        </div>
+                        <div className="lumi-redpacket-sender-name">
+                          {openingRedPacketMessage.from === 'self'
+                            ? `${playerWechatNickname}发出的红包`
+                            : `${activeChat.name}发来的红包`}
+                        </div>
                       </div>
-                      <div className="lumi-redpacket-sender-name">
-                        {openingRedPacketMessage.from === 'self'
-                          ? `${playerWechatNickname}发出的红包`
-                          : `${activeChat.name}发来的红包`}
-                      </div>
+                      {!isRedPacketDetailOpened && (
+                        <div className="lumi-redpacket-note">
+                          {openingRedPacketMessage.redPacketNote || '恭喜发财，大吉大利'}
+                        </div>
+                      )}
                     </div>
-                    {!isRedPacketDetailOpened && (
-                      <div className="lumi-redpacket-note">
-                        {openingRedPacketMessage.redPacketNote || '恭喜发财，大吉大利'}
-                      </div>
-                    )}
-                  </div>
 
-                  {/* 中间：金币按钮 + 提示文字 */}
-                  <div className="lumi-redpacket-open-area">
-                    <button
-                      type="button"
-                      className={`lumi-redpacket-coin ${isRedPacketCoinAnimating ? 'lumi-redpacket-coin-spinning' : ''}`}
-                      onClick={() => {
-                        if (isRedPacketCoinAnimating) return;
-                        setIsRedPacketCoinAnimating(true);
-                        // 动画结束后进入详情页
-                        window.setTimeout(() => {
-                          setIsRedPacketDetailOpened(true);
-                        }, 1200);
-                      }}
-                    >
-                      <span className="lumi-redpacket-coin-symbol">開</span>
-                    </button>
+                    {/* 中间：金币按钮 + 提示文字 */}
+                    <div className="lumi-redpacket-open-area">
+                      <button
+                        type="button"
+                        className={`lumi-redpacket-coin ${isRedPacketCoinAnimating ? 'lumi-redpacket-coin-spinning' : ''}`}
+                        onClick={() => {
+                          if (isRedPacketCoinAnimating) return;
+                          setIsRedPacketCoinAnimating(true);
+                          // 动画结束后进入详情页
+                          window.setTimeout(() => {
+                            setIsRedPacketDetailOpened(true);
+                          }, 1200);
+                        }}
+                      >
+                        <span className="lumi-redpacket-coin-symbol">開</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {/* 拆开后的红包详情页（仿微信原生详情页） */}
             {openingRedPacketMessage && activeChat && isRedPacketDetailOpened && (
@@ -6845,7 +6846,7 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
                       <div className="lumi-redpacket-detail-tip">已存入零钱，可直接消费</div>
                       <div className="lumi-redpacket-detail-record">
                         <div className="lumi-redpacket-detail-record-item">
-                        <div className="lumi-redpacket-detail-record-avatar">
+                          <div className="lumi-redpacket-detail-record-avatar">
                             {playerAvatarUrl ? (
                               <img src={playerAvatarUrl} alt={playerWechatNickname} />
                             ) : (
@@ -8554,6 +8555,33 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
                     开启后，即使你切到别的标签页或把浏览器缩到后台，只要浏览器还在运行，就可以收到来自小手机的系统通知。
                     记得在浏览器和系统设置中都允许「通知」权限。
                   </div>
+                  <div style={{ marginTop: 12 }}>
+                    <button
+                      type="button"
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: 999,
+                        border: '1px solid #d1d5db',
+                        background: '#f9fafb',
+                        fontSize: 12,
+                        color: '#111827'
+                      }}
+                      disabled={pushBusy}
+                      onClick={async () => {
+                        if (pushBusy) return;
+                        setPushBusy(true);
+                        setPushMessage(null);
+                        try {
+                          const result = await testPushFromThisDevice();
+                          setPushMessage(result.message);
+                        } finally {
+                          setPushBusy(false);
+                        }
+                      }}
+                    >
+                      从本设备测试推送
+                    </button>
+                  </div>
                   {pushMessage && (
                     <div style={{ marginTop: 8, fontSize: 12, color: '#4b5563' }}>{pushMessage}</div>
                   )}
@@ -8965,187 +8993,187 @@ export const WeChatApp: React.FC<WeChatAppProps> = ({ onExit, onOpenApiSettings 
         !(activeTab === 'story' && inStoryRead) &&
         !(activeTab === 'contacts' && (contactsView === 'profile' || contactsView === 'settings' || contactsView === 'permission')) &&
         !(activeTab === 'me' && showMeSettings) && (
-        <div className="wechat-tabs">
-          <button
-            type="button"
-            className={`wechat-tab ${activeTab === 'chat' ? 'wechat-tab-active' : ''}`}
-            onClick={() => handleTabChange('chat')}
-          >
-            <div className="wechat-tab-icon">
-              <svg viewBox="0 0 24 24" width="32" height="32">
-                <path
-                  d="M6 8.5C6 7.11929 7.11929 6 8.5 6H15C16.3807 6 17.5 7.11929 17.5 8.5V12C17.5 13.3807 16.3807 14.5 15 14.5H11.2L8.8 16.5V14.5H8.5C7.11929 14.5 6 13.3807 6 12V8.5Z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle cx="10" cy="10" r="0.9" fill="currentColor" />
-                <circle cx="13.5" cy="10" r="0.9" fill="currentColor" />
-              </svg>
-            </div>
-            <span>微信</span>
-          </button>
-          <button
-            type="button"
-            className={`wechat-tab ${activeTab === 'contacts' ? 'wechat-tab-active' : ''}`}
-            onClick={() => handleTabChange('contacts')}
-          >
-            <div className="wechat-tab-icon">
-              <svg viewBox="0 0 24 24" width="32" height="32">
-                <rect
-                  x="6.5"
-                  y="4.5"
-                  width="11"
-                  height="15"
-                  rx="2"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                />
-                <circle
-                  cx="11"
-                  cy="10"
-                  r="1.7"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                />
-                <path
-                  d="M8.8 14C9.4 13 10.2 12.5 11 12.5C11.8 12.5 12.6 13 13.2 14"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M14.2 8.3H16.2"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M14.2 10.6H16.2"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M14.2 12.9H16.2"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-            <span>通讯录</span>
-          </button>
-          <button
-            type="button"
-            className={`wechat-tab ${activeTab === 'discover' ? 'wechat-tab-active' : ''}`}
-            onClick={() => handleTabChange('discover')}
-          >
-            <div className="wechat-tab-icon">
-              <svg viewBox="0 0 24 24" width="32" height="32">
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="7"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                />
-                <path
-                  d="M10 10L15 9L14 14L9 15L10 10Z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle cx="12" cy="12" r="0.9" fill="currentColor" />
-              </svg>
-            </div>
-            <span>发现</span>
-          </button>
-          <button
-            type="button"
-            className="wechat-tab"
-            onClick={() => handleTabChange('story')}
-          >
-            <div className="wechat-tab-icon">
-              <svg viewBox="0 0 24 24" width="32" height="32">
-                <rect
-                  x="6"
-                  y="7"
-                  width="12"
-                  height="9"
-                  rx="2"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                />
-                <path
-                  d="M9 7L10 6H14L15 7"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M9 12H15"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M9 15H12"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-            <span>线下</span>
-          </button>
-          <button
-            type="button"
-            className={`wechat-tab ${activeTab === 'me' ? 'wechat-tab-active' : ''}`}
-            onClick={() => handleTabChange('me')}
-          >
-            <div className="wechat-tab-icon">
-              <svg viewBox="0 0 24 24" width="32" height="32">
-                <circle
-                  cx="12"
-                  cy="10"
-                  r="2.6"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                />
-                <path
-                  d="M7.5 17C8.5 15.3 10.1 14.4 12 14.4C13.9 14.4 15.5 15.3 16.5 17"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                />
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="7"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                />
-              </svg>
-            </div>
-            <span>我</span>
-          </button>
-        </div>
-      )}
+          <div className="wechat-tabs">
+            <button
+              type="button"
+              className={`wechat-tab ${activeTab === 'chat' ? 'wechat-tab-active' : ''}`}
+              onClick={() => handleTabChange('chat')}
+            >
+              <div className="wechat-tab-icon">
+                <svg viewBox="0 0 24 24" width="32" height="32">
+                  <path
+                    d="M6 8.5C6 7.11929 7.11929 6 8.5 6H15C16.3807 6 17.5 7.11929 17.5 8.5V12C17.5 13.3807 16.3807 14.5 15 14.5H11.2L8.8 16.5V14.5H8.5C7.11929 14.5 6 13.3807 6 12V8.5Z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <circle cx="10" cy="10" r="0.9" fill="currentColor" />
+                  <circle cx="13.5" cy="10" r="0.9" fill="currentColor" />
+                </svg>
+              </div>
+              <span>微信</span>
+            </button>
+            <button
+              type="button"
+              className={`wechat-tab ${activeTab === 'contacts' ? 'wechat-tab-active' : ''}`}
+              onClick={() => handleTabChange('contacts')}
+            >
+              <div className="wechat-tab-icon">
+                <svg viewBox="0 0 24 24" width="32" height="32">
+                  <rect
+                    x="6.5"
+                    y="4.5"
+                    width="11"
+                    height="15"
+                    rx="2"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                  />
+                  <circle
+                    cx="11"
+                    cy="10"
+                    r="1.7"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
+                  <path
+                    d="M8.8 14C9.4 13 10.2 12.5 11 12.5C11.8 12.5 12.6 13 13.2 14"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M14.2 8.3H16.2"
+                    stroke="currentColor"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M14.2 10.6H16.2"
+                    stroke="currentColor"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M14.2 12.9H16.2"
+                    stroke="currentColor"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </div>
+              <span>通讯录</span>
+            </button>
+            <button
+              type="button"
+              className={`wechat-tab ${activeTab === 'discover' ? 'wechat-tab-active' : ''}`}
+              onClick={() => handleTabChange('discover')}
+            >
+              <div className="wechat-tab-icon">
+                <svg viewBox="0 0 24 24" width="32" height="32">
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="7"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                  />
+                  <path
+                    d="M10 10L15 9L14 14L9 15L10 10Z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <circle cx="12" cy="12" r="0.9" fill="currentColor" />
+                </svg>
+              </div>
+              <span>发现</span>
+            </button>
+            <button
+              type="button"
+              className="wechat-tab"
+              onClick={() => handleTabChange('story')}
+            >
+              <div className="wechat-tab-icon">
+                <svg viewBox="0 0 24 24" width="32" height="32">
+                  <rect
+                    x="6"
+                    y="7"
+                    width="12"
+                    height="9"
+                    rx="2"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                  />
+                  <path
+                    d="M9 7L10 6H14L15 7"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M9 12H15"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M9 15H12"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </div>
+              <span>线下</span>
+            </button>
+            <button
+              type="button"
+              className={`wechat-tab ${activeTab === 'me' ? 'wechat-tab-active' : ''}`}
+              onClick={() => handleTabChange('me')}
+            >
+              <div className="wechat-tab-icon">
+                <svg viewBox="0 0 24 24" width="32" height="32">
+                  <circle
+                    cx="12"
+                    cy="10"
+                    r="2.6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                  />
+                  <path
+                    d="M7.5 17C8.5 15.3 10.1 14.4 12 14.4C13.9 14.4 15.5 15.3 16.5 17"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="7"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                  />
+                </svg>
+              </div>
+              <span>我</span>
+            </button>
+          </div>
+        )}
 
       {/* 自动回复（功能菜单里的“自动回复”）加载提示 */}
       {showAutoReplyLoading && (
