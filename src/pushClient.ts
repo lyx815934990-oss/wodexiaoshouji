@@ -8,10 +8,11 @@ const VAPID_PUBLIC_KEY =
   'BJOFT35nXTBG6xil5t5kPLOnyZvlGomKDST5TVTtP2WqQOE3xqj8vSmsUdOqNXq4czdKsJcAINr6mL12C5VyVIc';
 
 // 后端推送服务地址：
-// - 本地开发默认 http://localhost:4000（使用 push-server.js）
-// - 线上如果前后端同域（例如直接部署在 Vercel），可以留空，自动用当前站点 origin
+// - 本地开发：默认 http://localhost:4000（使用 push-server.js）
+// - 线上：固定调用 Vercel 上的后端域名，或者通过环境变量覆盖
 const PUSH_SERVER_BASE_URL =
-  import.meta.env.VITE_PUSH_SERVER_BASE_URL || (import.meta.env.DEV ? 'http://localhost:4000' : '');
+  import.meta.env.VITE_PUSH_SERVER_BASE_URL ||
+  (import.meta.env.DEV ? 'http://localhost:4000' : 'https://wodexiaoshouji.vercel.app');
 
 const STORAGE_KEY_ENABLED = 'mini-ai-phone.push-enabled';
 
@@ -95,10 +96,7 @@ export const enablePush = async (): Promise<ToggleResult> => {
       });
     }
 
-    const base =
-      PUSH_SERVER_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
-
-    await fetch(`${base}/api/save-subscription`, {
+    await fetch(`${PUSH_SERVER_BASE_URL}/api/save-subscription`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
