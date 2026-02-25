@@ -15,11 +15,6 @@ module.exports = function handler(req, res) {
     return;
   }
 
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
-
   const sub = req.body;
   store.setLatest(sub);
 
