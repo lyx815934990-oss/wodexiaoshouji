@@ -8,8 +8,8 @@ const VAPID_PUBLIC_KEY =
   'BJOFT35nXTBG6xil5t5kPLOnyZvlGomKDST5TVTtP2WqQOE3xqj8vSmsUdOqNXq4czdKsJcAINr6mL12C5VyVIc';
 
 // 后端推送服务地址：
-// 本地开发默认 http://localhost:4000
-// 上线后可以在 .env 里设置 VITE_PUSH_SERVER_BASE_URL 为你的 Vercel 域名
+// - 本地开发默认 http://localhost:4000（使用 push-server.js）
+// - 线上如果前后端同域（例如直接部署在 Vercel），可以留空，自动用当前站点 origin
 const PUSH_SERVER_BASE_URL =
   import.meta.env.VITE_PUSH_SERVER_BASE_URL || (import.meta.env.DEV ? 'http://localhost:4000' : '');
 
@@ -41,7 +41,8 @@ export const registerServiceWorker = async (): Promise<ServiceWorkerRegistration
   if (!isPushSupported()) return null;
 
   try {
-    const registration = await navigator.serviceWorker.register('/sw.js');
+    const swPath = `${import.meta.env.BASE_URL || '/'}sw.js`;
+    const registration = await navigator.serviceWorker.register(swPath);
     return registration;
   } catch (err) {
     console.error('[pushClient] 注册 Service Worker 失败:', err);
@@ -77,13 +78,6 @@ export const enablePush = async (): Promise<ToggleResult> => {
     return { ok: false, message: '当前浏览器不支持系统级通知或 Web Push。请用最新版 Chrome / Edge / Safari 测试。' };
   }
 
-  if (!PUSH_SERVER_BASE_URL) {
-    return {
-      ok: false,
-      message: '后端推送地址未配置，请在 .env 中设置 VITE_PUSH_SERVER_BASE_URL 或本地启动 push-server。'
-    };
-  }
-
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') {
     return { ok: false, message: '你没有允许通知权限，无法开启后台推送。' };
@@ -93,13 +87,18 @@ export const enablePush = async (): Promise<ToggleResult> => {
     const registration = await navigator.serviceWorker.ready;
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
+      const appServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        // 某些 TypeScript DOM 类型定义比较老，这里做一次兼容性断言
+        applicationServerKey: appServerKey as unknown as ArrayBuffer
       });
     }
 
-    await fetch(`${PUSH_SERVER_BASE_URL}/api/save-subscription`, {
+    const base =
+      PUSH_SERVER_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+
+    await fetch(`${base}/api/save-subscription`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

@@ -1,9 +1,16 @@
 import react from '@vitejs/plugin-react-swc';
 import { defineConfig } from 'vite';
 
+// 如果要部署到 GitHub Pages，仓库名就是路径前缀：/wodexiaoshouji/
+// 本地开发时 Vite 会自动处理这个 base，不影响你用 http://localhost:5173 访问
+const base =
+  process.env.GITHUB_PAGES === 'true'
+    ? '/wodexiaoshouji/'
+    : '/';
+
 export default defineConfig({
   plugins: [react()],
-  // base: '/wodexiaoshouji/', // 临时注释掉，方便本地测试
+  base,
   server: {
     host: true, // 允许局域网访问
     port: 5173,
@@ -18,6 +25,7 @@ export default defineConfig({
     }
   }
 });
+
 
 
 
