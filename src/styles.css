@@ -12394,7 +12394,7 @@ body {
   position: absolute;
   inset: 0;
   background-color: #f2f2f4;
-  background-image: url('/image/开屏动画背景图.jpg');
+  background-image: url('../image/开屏动画背景图.jpg');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

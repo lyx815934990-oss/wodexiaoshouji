@@ -22,7 +22,7 @@ const OPENING_QUOTES: string[] = [
   '从此唯行乐 闲愁奈我何.',
 ];
 
-const logoSrc = `/image/${encodeURIComponent('主屏幕图标.jpg')}`;
+const logoSrc = new URL('../../image/主屏幕图标.png', import.meta.url).toString();
 
 type OpeningSplashProps = {
   onFinish: () => void;
